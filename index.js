@@ -1,6 +1,6 @@
 // ============================================================
-//  MALEDIKE BOT — index.js
-//  Slash commands : /rank /derank /rankconfig
+//  MALEDIKE BOT — index.js  (version corrigée)
+//  Slash commands : /help /rank /derank /rankconfig ...
 //  Owner Bot intégré | Keep-Alive Render
 // ============================================================
 
@@ -14,14 +14,14 @@ const {
   EmbedBuilder,
   PermissionsBitField,
   Events,
-  ChannelType,
+  ActivityType,
 } = require("discord.js");
 const express = require("express");
 const fetch   = require("node-fetch");
 const fs      = require("fs");
 
 // ─────────────────────────────────────────────
-//  TOKEN — Secret File Render (/etc/secrets/TOKEN) ou env
+//  TOKEN
 // ─────────────────────────────────────────────
 function loadToken() {
   try {
@@ -46,48 +46,33 @@ const CONFIG = {
   RENDER_URL: "https://hhh-eyls.onrender.com",
   SERVER_NAME: "Maledike",
 
-  // Owners Bot — immunité totale, accès à tout
   OWNER_IDS: ["685679698054742017", "465620464232955911"],
 
-  // Couleurs
   COLORS: {
-    success: 0x1a1a1a,   // noir quasi-pur avec bordure verte
-    error:   0xcc0000,   // rouge
-    info:    0x1a1a1a,   // noir
-    rank:    0x1a1a1a,   // noir (bordure gauche colorée dans Discord)
+    success: 0x1a1a1a,
+    error:   0xcc0000,
+    info:    0x1a1a1a,
+    rank:    0x1a1a1a,
     derank:  0xcc0000,
     owner:   0xcc0000,
   },
 
-  // rankConfig : tableau de règles de rang
-  // Chaque règle : { rankRole, assignRoles, maxRole, allowedRoles }
-  //   rankRole    : ID du rôle qu'on donne
-  //   assignRoles : [IDs] des rôles automatiquement attribués avec rankRole
-  //   maxRole     : ID du rôle plafond (ne peut pas rank au-dessus)
-  //   allowedRoles: [IDs] des rôles autorisés à rank ce rankRole
   RANK_CONFIG: [],
-  // Exemple après /rankconfig add :
-  // { rankRole: "123", assignRoles: ["456","789"], maxRole: "999", allowedRoles: ["AAA"] }
 };
 
 // ─────────────────────────────────────────────
 //  STOCKAGE EN MÉMOIRE
 // ─────────────────────────────────────────────
 const store = {
-  blacklist:  new Map(), // { userID: { reason, modId, date } }
-  bans:       new Map(), // { userID: { reason, modId, date } }
+  blacklist: new Map(),
+  bans:      new Map(),
 };
 
 // ─────────────────────────────────────────────
 //  HELPERS
 // ─────────────────────────────────────────────
-function isOwner(userId) {
-  return CONFIG.OWNER_IDS.includes(userId);
-}
-
-function isAdmin(member) {
-  return member.permissions.has(PermissionsBitField.Flags.Administrator);
-}
+function isOwner(userId)  { return CONFIG.OWNER_IDS.includes(userId); }
+function isAdmin(member)  { return member.permissions.has(PermissionsBitField.Flags.Administrator); }
 
 async function sendDM(user, embedData) {
   try { await user.send({ embeds: [embedData] }); } catch {}
@@ -100,24 +85,20 @@ async function totalDerank(member) {
   } catch {}
 }
 
-// Trouve la règle de rank config pour un rôle donné
 function getRankRule(roleId) {
   return CONFIG.RANK_CONFIG.find((r) => r.rankRole === roleId) || null;
 }
 
-// Vérifie si un membre a le droit de rank un rôle donné
 function canRank(member, roleId) {
   if (isOwner(member.id) || isAdmin(member)) return true;
   const rule = getRankRule(roleId);
-  if (!rule) return true; // pas de règle = libre
-  if (rule.allowedRoles.length === 0) return true; // aucune restriction
+  if (!rule) return true;
+  if (rule.allowedRoles.length === 0) return true;
   return member.roles.cache.some((r) => rule.allowedRoles.includes(r.id));
 }
 
-// Vérifie si le rôle à donner dépasse le plafond du membre
 function exceedsCeiling(member, roleToGiveId) {
   if (isOwner(member.id) || isAdmin(member)) return false;
-  // Cherche une règle dont le membre a le allowedRole
   for (const rule of CONFIG.RANK_CONFIG) {
     if (rule.maxRole && rule.allowedRoles.some((r) => member.roles.cache.has(r))) {
       const ceiling = member.guild.roles.cache.get(rule.maxRole);
@@ -148,6 +129,11 @@ const client = new Client({
 // ─────────────────────────────────────────────
 const slashCommands = [
 
+  // /help  ← NOUVEAU
+  new SlashCommandBuilder()
+    .setName("help")
+    .setDescription("Affiche toutes les commandes disponibles"),
+
   // /rank
   new SlashCommandBuilder()
     .setName("rank")
@@ -165,18 +151,18 @@ const slashCommands = [
   // /rankconfig
   new SlashCommandBuilder()
     .setName("rankconfig")
-    .setDescription("Configure les règles de rang")
+    .setDescription("Configure les règles de rang (Admin/Owner uniquement)")
     .addStringOption((o) =>
       o.setName("action")
         .setDescription("Action à effectuer")
         .setRequired(true)
         .addChoices(
-          { name: "Ajouter une règle de rang",           value: "add" },
-          { name: "Supprimer une règle de rang",         value: "remove" },
-          { name: "Voir toutes les règles",              value: "show" },
-          { name: "Définir rôles autorisés à rank",      value: "setallowed" },
-          { name: "Définir rôle plafond max",            value: "setceiling" },
-          { name: "Lier rôles auto au rank",             value: "linkroles" },
+          { name: "Ajouter une règle de rang",      value: "add" },
+          { name: "Supprimer une règle de rang",    value: "remove" },
+          { name: "Voir toutes les règles",         value: "show" },
+          { name: "Définir rôles autorisés à rank", value: "setallowed" },
+          { name: "Définir rôle plafond max",       value: "setceiling" },
+          { name: "Lier rôles auto au rank",        value: "linkroles" },
         )
     )
     .addRoleOption((o) => o.setName("role").setDescription("Rôle principal concerné").setRequired(false))
@@ -256,21 +242,35 @@ const rest = new REST({ version: "10" }).setToken(BOT_TOKEN);
   try {
     console.log("Déploiement des commandes slash...");
     if (CONFIG.GUILD_ID) {
-      await rest.put(Routes.applicationGuildCommands(CONFIG.CLIENT_ID, CONFIG.GUILD_ID), { body: slashCommands });
+      await rest.put(
+        Routes.applicationGuildCommands(CONFIG.CLIENT_ID, CONFIG.GUILD_ID),
+        { body: slashCommands }
+      );
+      console.log(`✅ Commandes déployées sur le serveur ${CONFIG.GUILD_ID}`);
     } else {
       await rest.put(Routes.applicationCommands(CONFIG.CLIENT_ID), { body: slashCommands });
+      console.log("✅ Commandes déployées globalement (jusqu'à 1h de délai).");
     }
-    console.log("✅ Commandes déployées.");
   } catch (err) {
     console.error("❌ Erreur déploiement:", err.message);
   }
 })();
 
 // ─────────────────────────────────────────────
-//  READY
+//  READY — statut discord.gg/maledike
 // ─────────────────────────────────────────────
 client.once("ready", () => {
   console.log(`✅ Bot connecté : ${client.user.tag}`);
+
+  // ── Statut "Joue à discord.gg/maledike" ──
+  client.user.setPresence({
+    activities: [{
+      name: "discord.gg/maledike",
+      type: ActivityType.Playing,   // "Joue à"
+    }],
+    status: "online",
+  });
+
   startKeepAlive();
 });
 
@@ -295,12 +295,54 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   const { commandName, member, guild } = interaction;
 
-  // Helper : répondre avec un embed simple
   const reply = (color, desc, fields = [], ephemeral = false) => {
     const e = new EmbedBuilder().setColor(color).setDescription(desc);
     if (fields.length) e.addFields(fields);
     return interaction.reply({ embeds: [e], ephemeral });
   };
+
+  // ════════════════════════════════════════════
+  //  /help  ← NOUVEAU
+  // ════════════════════════════════════════════
+  if (commandName === "help") {
+    const helpEmbed = new EmbedBuilder()
+      .setColor(0x1a1a1a)
+      .setTitle("╸ Commandes Maledike")
+      .setDescription("discord.gg/maledike")
+      .addFields(
+        {
+          name: "🎖️ Gestion des rangs",
+          value: [
+            "`/rank` `membre` `role` — Attribue un rôle à un membre",
+            "`/derank` `membre` `raison` — Retire tous les rôles d'un membre",
+            "`/rankconfig` — Configure les règles de rang *(Admin)*",
+          ].join("\n"),
+        },
+        {
+          name: "🔨 Modération",
+          value: [
+            "`/ban` `membre` `[raison]` — Bannir un membre",
+            "`/unban` `id` — Débannir un utilisateur",
+            "`/baninfo` `id` — Infos sur un ban",
+            "`/bl` `membre` `raison` — Blacklister un membre",
+            "`/unbl` `id` — Retirer la blacklist",
+            "`/blist` — Liste des blacklistés",
+            "`/blinfo` `id` — Infos sur une blacklist",
+          ].join("\n"),
+        },
+        {
+          name: "👑 Owner Bot",
+          value: [
+            "`/ownerbot` `membre` — Ajouter un Owner Bot",
+            "`/unownerbot` `membre` — Retirer un Owner Bot",
+            "`/ownerbotlist` — Liste des Owners Bot",
+          ].join("\n"),
+        },
+      )
+      .setFooter({ text: "Maledike • discord.gg/maledike" });
+
+    return interaction.reply({ embeds: [helpEmbed] });
+  }
 
   // ════════════════════════════════════════════
   //  /rank
@@ -310,48 +352,36 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const role         = interaction.options.getRole("role");
     const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
 
-    // Protection Owner
-    if (isOwner(targetUser.id)) {
+    if (isOwner(targetUser.id))
       return reply(0xcc0000, "Vous ne pouvez pas utiliser une commande sur un Owner Bot.", [], true);
-    }
 
-    if (!targetMember) {
+    if (!targetMember)
       return reply(0xcc0000, "Ce membre n'est pas sur le serveur.", [], true);
-    }
 
-    // Vérif permission de rank ce rôle
-    if (!canRank(member, role.id)) {
+    if (!canRank(member, role.id))
       return reply(0xcc0000, `Vous n'avez pas l'autorisation d'attribuer **${role.name}**.`, [], true);
-    }
 
-    // Vérif plafond
     if (exceedsCeiling(member, role.id)) {
-      // Embed style photo partagée
       const ceilEmbed = new EmbedBuilder()
         .setColor(0x2b2d31)
         .setDescription(`✗  Vous ne pouvez pas attribuer **${role}**.`);
-      return interaction.reply({ embeds: [ceilEmbed], ephemeral: false });
+      return interaction.reply({ embeds: [ceilEmbed] });
     }
 
     try {
       await targetMember.roles.add(role, `Rank par ${member.user.tag}`);
 
-      // Rôles automatiquement liés
-      const rule = getRankRule(role.id);
+      const rule     = getRankRule(role.id);
       const autoAdded = [];
       if (rule && rule.assignRoles.length > 0) {
         for (const autoRoleId of rule.assignRoles) {
           const autoRole = guild.roles.cache.get(autoRoleId);
           if (autoRole) {
-            try {
-              await targetMember.roles.add(autoRole, "Rôle lié au rank");
-              autoAdded.push(autoRole);
-            } catch {}
+            try { await targetMember.roles.add(autoRole, "Rôle lié au rank"); autoAdded.push(autoRole); } catch {}
           }
         }
       }
 
-      // Rôles après rank
       const rolesAfter = targetMember.roles.cache
         .filter((r) => r.id !== guild.id)
         .sort((a, b) => b.position - a.position)
@@ -365,9 +395,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
           (autoAdded.length > 0 ? `\nRôles ajoutés : ${autoAdded.map((r) => `<@&${r.id}>`).join(", ")}` : "")
         )
         .addFields(
-          { name: "Rôles actuels", value: rolesAfter },
-          { name: "Par", value: `<@${member.id}>`, inline: true },
-          { name: "Rôle attribué", value: `<@&${role.id}>`, inline: true },
+          { name: "Rôles actuels",   value: rolesAfter },
+          { name: "Par",             value: `<@${member.id}>`, inline: true },
+          { name: "Rôle attribué",   value: `<@&${role.id}>`,  inline: true },
         );
 
       return interaction.reply({ embeds: [rankEmbed] });
@@ -384,18 +414,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const raison       = interaction.options.getString("raison");
     const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
 
-    // Protection Owner
-    if (isOwner(targetUser.id)) {
+    if (isOwner(targetUser.id))
       return reply(0xcc0000, "Vous ne pouvez pas derank un Owner Bot.", [], true);
-    }
 
-    if (!targetMember) {
+    if (!targetMember)
       return reply(0xcc0000, "Ce membre n'est pas sur le serveur.", [], true);
-    }
 
-    // Vérif permission
     if (!isOwner(member.id) && !isAdmin(member)) {
-      // Vérif whitelist derank
       const wl = CONFIG.COMMAND_WHITELIST?.derank;
       if (wl && (wl.roles.length > 0 || wl.users.length > 0)) {
         const ok = wl.users.includes(member.id) || member.roles.cache.some((r) => wl.roles.includes(r.id));
@@ -403,7 +428,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       }
     }
 
-    // Rôles avant derank (pour affichage)
     const rolesBefore = targetMember.roles.cache
       .filter((r) => r.id !== guild.id)
       .sort((a, b) => b.position - a.position)
@@ -412,7 +436,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     await totalDerank(targetMember);
 
-    // MP à la cible
     const dmEmbed = new EmbedBuilder()
       .setColor(0xcc0000)
       .setDescription(`Vous avez été derank sur **${CONFIG.SERVER_NAME}**.\nRaison : ${raison}`);
@@ -434,9 +457,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   //  /rankconfig
   // ════════════════════════════════════════════
   if (commandName === "rankconfig") {
-    if (!isOwner(member.id) && !isAdmin(member)) {
+    if (!isOwner(member.id) && !isAdmin(member))
       return reply(0xcc0000, "Réservé aux administrateurs et Owners Bot.", [], true);
-    }
 
     const action       = interaction.options.getString("action");
     const role         = interaction.options.getRole("role");
@@ -445,41 +467,30 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const role4        = interaction.options.getRole("role4");
     const roleAutorise = interaction.options.getRole("roleautorise");
 
-    // ── show ──
     if (action === "show") {
-      if (CONFIG.RANK_CONFIG.length === 0) {
+      if (CONFIG.RANK_CONFIG.length === 0)
         return reply(0x1a1a1a, "Aucune règle de rang configurée.", []);
-      }
       const lines = CONFIG.RANK_CONFIG.map((r, i) => {
         const rr      = guild.roles.cache.get(r.rankRole)?.name || r.rankRole;
         const ceiling = r.maxRole ? (guild.roles.cache.get(r.maxRole)?.name || r.maxRole) : "Aucun";
         const linked  = r.assignRoles.length > 0 ? r.assignRoles.map((id) => `<@&${id}>`).join(", ") : "Aucun";
         const allowed = r.allowedRoles.length > 0 ? r.allowedRoles.map((id) => `<@&${id}>`).join(", ") : "Tous";
-        return `**${i + 1}. ${rr}**\n→ Plafond : ${ceiling} | Rôles liés : ${linked} | Autorisés à rank : ${allowed}`;
+        return `**${i + 1}. ${rr}**\n→ Plafond : ${ceiling} | Rôles liés : ${linked} | Autorisés : ${allowed}`;
       });
-      const e = new EmbedBuilder()
-        .setColor(0x1a1a1a)
+      const e = new EmbedBuilder().setColor(0x1a1a1a)
         .setTitle("Configuration des rangs")
         .setDescription(lines.join("\n\n"));
       return interaction.reply({ embeds: [e], ephemeral: true });
     }
 
-    // ── add ──
     if (action === "add") {
-      if (!role) return reply(0xcc0000, "Précisez le rôle à ajouter avec `role`.", [], true);
-      if (CONFIG.RANK_CONFIG.find((r) => r.rankRole === role.id)) {
+      if (!role) return reply(0xcc0000, "Précisez le rôle avec `role`.", [], true);
+      if (CONFIG.RANK_CONFIG.find((r) => r.rankRole === role.id))
         return reply(0xcc0000, `Une règle existe déjà pour **${role.name}**.`, [], true);
-      }
-      CONFIG.RANK_CONFIG.push({
-        rankRole:     role.id,
-        assignRoles:  [],
-        maxRole:      null,
-        allowedRoles: [],
-      });
-      return reply(0x1a1a1a, `Règle créée pour **${role.name}**.\nUtilise \`/rankconfig setceiling\`, \`linkroles\` et \`setallowed\` pour la compléter.`);
+      CONFIG.RANK_CONFIG.push({ rankRole: role.id, assignRoles: [], maxRole: null, allowedRoles: [] });
+      return reply(0x1a1a1a, `Règle créée pour **${role.name}**.\nUtilise \`setceiling\`, \`linkroles\` et \`setallowed\` pour la compléter.`);
     }
 
-    // ── remove ──
     if (action === "remove") {
       if (!role) return reply(0xcc0000, "Précisez le rôle avec `role`.", [], true);
       const idx = CONFIG.RANK_CONFIG.findIndex((r) => r.rankRole === role.id);
@@ -488,42 +499,28 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return reply(0x1a1a1a, `Règle supprimée pour **${role.name}**.`);
     }
 
-    // ── setceiling ──
     if (action === "setceiling") {
       if (!role || !role2) return reply(0xcc0000, "`role` = rôle concerné, `role2` = plafond max.", [], true);
       let rule = CONFIG.RANK_CONFIG.find((r) => r.rankRole === role.id);
-      if (!rule) {
-        rule = { rankRole: role.id, assignRoles: [], maxRole: null, allowedRoles: [] };
-        CONFIG.RANK_CONFIG.push(rule);
-      }
+      if (!rule) { rule = { rankRole: role.id, assignRoles: [], maxRole: null, allowedRoles: [] }; CONFIG.RANK_CONFIG.push(rule); }
       rule.maxRole = role2.id;
       return reply(0x1a1a1a, `Plafond défini : **${role.name}** ne peut pas dépasser **${role2.name}**.`);
     }
 
-    // ── linkroles ──
     if (action === "linkroles") {
       if (!role) return reply(0xcc0000, "Précisez le rôle principal avec `role`.", [], true);
       let rule = CONFIG.RANK_CONFIG.find((r) => r.rankRole === role.id);
-      if (!rule) {
-        rule = { rankRole: role.id, assignRoles: [], maxRole: null, allowedRoles: [] };
-        CONFIG.RANK_CONFIG.push(rule);
-      }
+      if (!rule) { rule = { rankRole: role.id, assignRoles: [], maxRole: null, allowedRoles: [] }; CONFIG.RANK_CONFIG.push(rule); }
       const toLink = [role2, role3, role4].filter(Boolean);
       if (toLink.length === 0) return reply(0xcc0000, "Précisez au moins un rôle lié avec `role2`.", [], true);
-      for (const r of toLink) {
-        if (!rule.assignRoles.includes(r.id)) rule.assignRoles.push(r.id);
-      }
-      return reply(0x1a1a1a, `Rôles liés à **${role.name}** : ${toLink.map((r) => `<@&${r.id}>`).join(", ")}\nIls seront attribués automatiquement lors d'un rank.`);
+      for (const r of toLink) { if (!rule.assignRoles.includes(r.id)) rule.assignRoles.push(r.id); }
+      return reply(0x1a1a1a, `Rôles liés à **${role.name}** : ${toLink.map((r) => `<@&${r.id}>`).join(", ")}`);
     }
 
-    // ── setallowed ──
     if (action === "setallowed") {
-      if (!role || !roleAutorise) return reply(0xcc0000, "`role` = rôle de rang, `roleautorise` = rôle autorisé à le donner.", [], true);
+      if (!role || !roleAutorise) return reply(0xcc0000, "`role` = rôle de rang, `roleautorise` = rôle autorisé.", [], true);
       let rule = CONFIG.RANK_CONFIG.find((r) => r.rankRole === role.id);
-      if (!rule) {
-        rule = { rankRole: role.id, assignRoles: [], maxRole: null, allowedRoles: [] };
-        CONFIG.RANK_CONFIG.push(rule);
-      }
+      if (!rule) { rule = { rankRole: role.id, assignRoles: [], maxRole: null, allowedRoles: [] }; CONFIG.RANK_CONFIG.push(rule); }
       if (!rule.allowedRoles.includes(roleAutorise.id)) rule.allowedRoles.push(roleAutorise.id);
       return reply(0x1a1a1a, `**${roleAutorise.name}** est maintenant autorisé à rank **${role.name}**.`);
     }
@@ -562,7 +559,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const lines = [];
     for (const id of CONFIG.OWNER_IDS) {
       const u = await client.users.fetch(id).catch(() => null);
-      lines.push(`${u ? `**${u.tag}**` : `\`${id}\``}  ${HARDCODED.includes(id) ? "(originel)" : ""}`);
+      lines.push(`${u ? `**${u.tag}**` : `\`${id}\``}  ${HARDCODED.includes(id) ? "*(originel)*" : ""}`);
     }
     const e = new EmbedBuilder().setColor(0xcc0000)
       .setTitle("Owners Bot")
@@ -575,8 +572,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // ════════════════════════════════════════════
   if (commandName === "ban") {
     if (!isOwner(member.id) && !isAdmin(member)) return reply(0xcc0000, "Permission refusée.", [], true);
-    const targetUser   = interaction.options.getUser("membre");
-    const raison       = interaction.options.getString("raison") || "Aucune raison fournie";
+    const targetUser = interaction.options.getUser("membre");
+    const raison     = interaction.options.getString("raison") || "Aucune raison fournie";
     if (isOwner(targetUser.id)) return reply(0xcc0000, "Vous ne pouvez pas bannir un Owner Bot.", [], true);
     try {
       await guild.bans.create(targetUser.id, { reason: raison, deleteMessageSeconds: 604800 });
@@ -584,8 +581,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const e = new EmbedBuilder().setColor(0xcc0000)
         .setDescription(`**${targetUser.tag}** a été banni.`)
         .addFields(
-          { name: "Par",     value: `<@${member.id}>`,  inline: true },
-          { name: "Raison",  value: raison,              inline: true },
+          { name: "Par",    value: `<@${member.id}>`, inline: true },
+          { name: "Raison", value: raison,             inline: true },
         );
       return interaction.reply({ embeds: [e] });
     } catch (err) {
@@ -612,8 +609,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     let guildBan  = null;
     try { guildBan = await guild.bans.fetch(id); } catch {}
     if (!banData && !guildBan) return reply(0x1a1a1a, "Cet utilisateur n'est pas banni.");
-    const u = await client.users.fetch(id).catch(() => null);
-    let mod = "🔴 Introuvable";
+    const u   = await client.users.fetch(id).catch(() => null);
+    let mod   = "🔴 Introuvable";
     if (banData?.modId) {
       const m = await client.users.fetch(banData.modId).catch(() => null);
       mod = m ? `${m.tag}` : "🔴 Introuvable";
@@ -623,8 +620,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .addFields(
         { name: "Cible",      value: u ? `${u.tag} (${id})` : id, inline: true },
         { name: "Modérateur", value: mod,                           inline: true },
-        { name: "Raison",     value: banData?.reason || guildBan?.reason || "Inconnue", inline: false },
-        { name: "Date",       value: banData?.date ? `<t:${Math.floor(new Date(banData.date).getTime() / 1000)}:F>` : "Inconnue", inline: false },
+        { name: "Raison",     value: banData?.reason || guildBan?.reason || "Inconnue" },
+        { name: "Date",       value: banData?.date ? `<t:${Math.floor(new Date(banData.date).getTime() / 1000)}:F>` : "Inconnue" },
       );
     return interaction.reply({ embeds: [e], ephemeral: true });
   }
@@ -692,8 +689,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .addFields(
         { name: "Cible",      value: u ? `${u.tag} (${id})` : id, inline: true },
         { name: "Modérateur", value: mod,                           inline: true },
-        { name: "Raison",     value: blData.reason,                 inline: false },
-        { name: "Date",       value: `<t:${Math.floor(new Date(blData.date).getTime() / 1000)}:F>`, inline: false },
+        { name: "Raison",     value: blData.reason },
+        { name: "Date",       value: `<t:${Math.floor(new Date(blData.date).getTime() / 1000)}:F>` },
       );
     return interaction.reply({ embeds: [e], ephemeral: true });
   }
