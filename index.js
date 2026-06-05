@@ -528,58 +528,114 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   // ════════════════════════════════════════════
-  //  ?help
+  //  ?help — Owners uniquement
   // ════════════════════════════════════════════
   if (command === "help") {
+    if (!isOwner(member.id)) {
+      return message.reply({
+        embeds: [
+          new EmbedBuilder()
+            .setColor(0x0d0d0d)
+            .setDescription("Accès refusé.")
+        ],
+      });
+    }
+
+    const sep = "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬";
+
     const helpEmbed = new EmbedBuilder()
-      .setColor(CONFIG.COLORS.help)
-      .setTitle("📖 Aide — Maledike Bot")
-      .setDescription("Toutes les commandes utilisent le préfixe **`?`**")
+      .setColor(0xcc0000)
+      .setTitle("Maledike UHQ")
+      .setDescription(
+        `Préfixe **\`?\`**  —  Accès conditionné par whitelist ou grade admin\n${sep}`
+      )
       .addFields(
         {
-          name: "━━━ 👑 Owner Bot",
+          name: "General",
           value: [
-            "`?ownerbot @user/ID` — Ajouter un Owner Bot",
-            "`?unownerbot @user/ID` — Retirer un Owner Bot",
-            "`?ownerbotlist` — Liste des Owners Bot",
+            "`?pic @user` → Photo de profil",
+            "`?banner @user` → Bannière",
+            "`?ui @user` → Infos utilisateur",
+            "`?snipe` → Dernier message supprimé",
           ].join("\n"),
         },
         {
-          name: "━━━ 🔨 Modération",
+          name: "\u200b",
+          value: sep,
+        },
+        {
+          name: "Moderation",
           value: [
-            "`?ban @user/ID [raison]` — Bannir un utilisateur",
-            "`?unban @user/ID` — Débannir un utilisateur",
-            "`?baninfo @user/ID` — Infos sur un ban",
+            "`?ban @user [raison]` → Bannir",
+            "`?unban @user` → Débannir",
+            "`?baninfo @user` → Infos ban",
+            "`?lock` / `?unlock` → Verrouille / déverrouille le salon",
+            "`?clear @user <nb>` → Supprime des messages",
+            "`?slowmode <secondes>` → Mode lent",
+            "`?addrole @user @role` → Ajouter un rôle",
+            "`?delrole @user @role` → Retirer un rôle",
+            "`?rolemembers @role` → Liste les membres d'un rôle",
+            "`?jail @user` → Jail",
+            "`?unjail @user` → Libère de jail",
+            "`?antiraid` → Anti-raid",
+            "`?limitrole @role <max>` → Limite un rôle",
+            "`?permimage @role` → Autorise les liens",
+            "`?rolelock @role` → Verrouille l'attribution d'un rôle",
+            "`?roleunlock @role` → Déverrouille un rôle",
           ].join("\n"),
         },
         {
-          name: "━━━ ⛔ Blacklist",
+          name: "\u200b",
+          value: sep,
+        },
+        {
+          name: "Rang",
           value: [
-            "`?bl @user/ID [raison]` — Blacklister un utilisateur",
-            "`?unbl @user/ID` — Retirer la blacklist",
-            "`?blist` — Liste des blacklistés",
-            "`?blinfo @user/ID` — Infos sur une blacklist",
+            "`?rank @user @role` → Attribuer un rôle (respect du plafond)",
+            "`?derank @user @role [raison]` → Retirer un rôle",
           ].join("\n"),
         },
         {
-          name: "━━━ 🎭 Slash Commands",
+          name: "\u200b",
+          value: sep,
+        },
+        {
+          name: "Blacklist",
           value: [
-            "`/rank @user @role` — Attribuer un rôle",
-            "`/derank @user [@role] [raison]` — Retirer un rôle",
-            "`/config` — Configurer le bot en live",
+            "`?bl @user [raison]` → Blacklister",
+            "`?unbl @user` → Retirer la blacklist",
+            "`?blist` → Liste des blacklistés",
+            "`?blinfo @user` → Infos blacklist",
           ].join("\n"),
         },
         {
-          name: "━━━ ℹ️ Notes",
+          name: "\u200b",
+          value: sep,
+        },
+        {
+          name: "Configuration",
           value: [
-            "• Les **Owners Bot** sont immunisés contre toutes les commandes.",
-            "• Les admins ont accès à toutes les commandes.",
-            "• Les whitelist se configurent via `/config`.",
+            "`/config` → Modifier la whitelist, les rôles protégés,",
+            "les plafonds de rang, les rôles VIP et voir la config actuelle.",
+            "Tout se règle directement depuis Discord, sans toucher au code.",
           ].join("\n"),
-        }
+        },
+        {
+          name: "\u200b",
+          value: sep,
+        },
+        {
+          name: "Owner Bot",
+          value: [
+            "`?ownerbot @user` → Ajouter un Owner Bot",
+            "`?unownerbot @user` → Retirer un Owner Bot",
+            "`?ownerbotlist` → Liste des Owners Bot",
+          ].join("\n"),
+        },
       )
-      .setFooter({ text: `${CONFIG.SERVER_NAME} Bot • Préfixe : ?` })
+      .setFooter({ text: "Maledike UHQ  —  usage interne uniquement" })
       .setTimestamp();
+
     return message.reply({ embeds: [helpEmbed] });
   }
 
