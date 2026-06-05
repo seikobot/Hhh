@@ -1,8 +1,3 @@
-Maledike Discord Bot - discord.js v14
-// Commandes : /rank /derank ?ban ?unban ?baninfo
-//             ?bl ?unbl ?blist ?blinfo
-//             + Anti-abus + Permissions
-// ============================================
 
 const { Client, GatewayIntentBits, SlashCommandBuilder, REST, Routes, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const express = require('express');
