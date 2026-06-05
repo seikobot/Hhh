@@ -41,7 +41,7 @@ if (!BOT_TOKEN) {
 // ─────────────────────────────────────────────
 const CONFIG = {
   TOKEN:      BOT_TOKEN,
-  CLIENT_ID:  process.env.CLIENT_ID,
+  CLIENT_ID:  process.env.CLIENT_ID || "1512391751653130310",
   GUILD_ID:   process.env.GUILD_ID,
   RENDER_URL: "https://hhh-eyls.onrender.com",
   SERVER_NAME: "Maledike",
