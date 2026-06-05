@@ -12,7 +12,7 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const CLIENT_ID = process.env.CLIENT_ID;
 const GUILD_ID  = process.env.GUILD_ID;
 const PORT      = process.env.PORT || 3000;
-const RENDER_URL = process.env.RENDER_URL || 'https://hhh-eyls.onrender.com';
+const RENDER_URL = process.env.RENDER_URL || 'https://hhh-1-p6c9.onrender.com';
 
 // Hiérarchie des rôles (ID Discord → niveau)
 // Plus le niveau est élevé, plus le rôle est puissant
