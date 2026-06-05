@@ -551,12 +551,10 @@ client.on(Events.MessageCreate, async (message) => {
       )
       .addFields(
         {
-          name: "General",
+          name: "Rang",
           value: [
-            "`?pic @user` → Photo de profil",
-            "`?banner @user` → Bannière",
-            "`?ui @user` → Infos utilisateur",
-            "`?snipe` → Dernier message supprimé",
+            "`?rank @user @role` → Attribuer un rôle (respect du plafond)",
+            "`?derank @user @role [raison]` → Retirer un rôle",
           ].join("\n"),
         },
         {
@@ -568,31 +566,7 @@ client.on(Events.MessageCreate, async (message) => {
           value: [
             "`?ban @user [raison]` → Bannir",
             "`?unban @user` → Débannir",
-            "`?baninfo @user` → Infos ban",
-            "`?lock` / `?unlock` → Verrouille / déverrouille le salon",
-            "`?clear @user <nb>` → Supprime des messages",
-            "`?slowmode <secondes>` → Mode lent",
-            "`?addrole @user @role` → Ajouter un rôle",
-            "`?delrole @user @role` → Retirer un rôle",
-            "`?rolemembers @role` → Liste les membres d'un rôle",
-            "`?jail @user` → Jail",
-            "`?unjail @user` → Libère de jail",
-            "`?antiraid` → Anti-raid",
-            "`?limitrole @role <max>` → Limite un rôle",
-            "`?permimage @role` → Autorise les liens",
-            "`?rolelock @role` → Verrouille l'attribution d'un rôle",
-            "`?roleunlock @role` → Déverrouille un rôle",
-          ].join("\n"),
-        },
-        {
-          name: "\u200b",
-          value: sep,
-        },
-        {
-          name: "Rang",
-          value: [
-            "`?rank @user @role` → Attribuer un rôle (respect du plafond)",
-            "`?derank @user @role [raison]` → Retirer un rôle",
+            "`?baninfo @user` → Infos sur un ban",
           ].join("\n"),
         },
         {
@@ -615,7 +589,7 @@ client.on(Events.MessageCreate, async (message) => {
         {
           name: "Configuration",
           value: [
-            "`/config` → Modifier la whitelist, les rôles protégés,",
+            "`?config` → Modifier la whitelist, les rôles protégés,",
             "les plafonds de rang, les rôles VIP et voir la config actuelle.",
             "Tout se règle directement depuis Discord, sans toucher au code.",
           ].join("\n"),
