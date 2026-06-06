@@ -45,8 +45,6 @@ const CONFIG = {
   HARDCODED:   ["685679698054742017", "465620464232955911"],
   RANK_CONFIG: [],
 
-  // Permissions configurables par catégorie
-  // Chaque clé = { roles: [], users: [] }
   PERMS: {
     bl:                 { roles: [], users: [] },
     ban:                { roles: [], users: [] },
@@ -54,23 +52,21 @@ const CONFIG = {
     derank_no_reason:   { roles: [], users: [] },
     wakeup:             { roles: [], users: [] },
     dog:                { roles: [], users: [] },
-    dog_bypass:         { roles: [], users: [] }, // peut undog n'importe qui
+    dog_bypass:         { roles: [], users: [] },
     blr:                { roles: [], users: [] },
     couniamanmanw:      { roles: [], users: [] },
     menotte:            { roles: [], users: [] },
-    system:             { roles: [], users: [] }, // statut "system" (top 2)
+    system:             { roles: [], users: [] },
   },
 
-  // Limites de taux par catégorie (par utilisateur)
   RATE_LIMITS: {
-    bl:            { max: 5,  windowMs: 30 * 60 * 1000 }, // 5 bls / 30min
-    ban:           { max: 5,  windowMs: 15 * 60 * 1000 }, // 5 bans / 15min
-    couniamanmanw: { max: 1,  windowMs: 60 * 60 * 1000 }, // 1 / heure
-    menotte:       { max: 3,  windowMs: 60 * 60 * 1000 }, // 3 menottes / heure
-    dog:           { limit: 3 }, // max de laisses simultanées par maître
+    bl:            { max: 5,  windowMs: 30 * 60 * 1000 },
+    ban:           { max: 5,  windowMs: 15 * 60 * 1000 },
+    couniamanmanw: { max: 1,  windowMs: 60 * 60 * 1000 },
+    menotte:       { max: 3,  windowMs: 60 * 60 * 1000 },
+    dog:           { limit: 3 },
   },
 
-  // Wakeup : une seule session à la fois
   WAKEUP_ACTIVE: false,
 };
 
@@ -78,31 +74,27 @@ const CONFIG = {
 //  STOCKAGE EN MÉMOIRE
 // ─────────────────────────────────────────────
 const store = {
-  blacklist:      new Map(), // id → { reason, modId, modType, date }
-  blr:            new Map(), // id → { reason, modId, date }
-  bans:           new Map(), // id → { reason, modId, modType, date }
-  dogs:           new Map(), // victimeId → { masterId, date }
-  menottes:       new Map(), // victimeId → { executorId, channelId, date }
-  couniamanmanw:  new Map(), // id → { executorId, date, timeoutEnd }
-  aykokemanmanw:  new Map(), // id → { executorId, date }
-  locknames:      new Map(), // id → lockedName
-  ourBans:        new Set(), // évite double DM sur GuildBanAdd
-  ourKicks:       new Set(), // évite double DM sur GuildMemberRemove
-
-  // Compteurs pour rate-limit
-  rateCounts:     new Map(), // `${userId}:${action}` → { count, resetAt }
+  blacklist:      new Map(),
+  blr:            new Map(),
+  bans:           new Map(),
+  dogs:           new Map(),
+  menottes:       new Map(),
+  couniamanmanw:  new Map(),
+  aykokemanmanw:  new Map(),
+  locknames:      new Map(),
+  ourBans:        new Set(),
+  ourKicks:       new Set(),
+  rateCounts:     new Map(),
 };
 
 // ─────────────────────────────────────────────
 //  HELPERS — HIÉRARCHIE
 // ─────────────────────────────────────────────
 
-/** Vérifie si un ID est System+ (= ownerbot) */
 function isSystemPlus(id) {
   return CONFIG.OWNER_IDS.includes(id);
 }
 
-/** Vérifie si un membre est System (top 2) */
 function isSystem(member) {
   const p = CONFIG.PERMS.system;
   if (!p) return false;
@@ -111,14 +103,12 @@ function isSystem(member) {
   return false;
 }
 
-/** Retourne le type de modérateur d'un membre */
 function getModType(member) {
   if (isSystemPlus(member.id)) return "system+";
   if (isSystem(member))        return "system";
   return "moderator";
 }
 
-/** Vérifie si un membre a la permission d'une catégorie */
 function hasPerm(member, key) {
   if (isSystemPlus(member.id)) return true;
   const p = CONFIG.PERMS[key];
@@ -128,16 +118,11 @@ function hasPerm(member, key) {
   return false;
 }
 
-/**
- * Vérifie la hiérarchie : est-ce que `actor` peut agir sur `target` ?
- * system ne peut pas toucher ce que system+ a fait.
- * system ne peut pas agir sur un autre system+ ou system.
- */
 function canActOn(actorMember, targetModType) {
   const actorType = getModType(actorMember);
-  if (actorType === "system+") return true; // system+ peut tout
-  if (actorType === "system" && targetModType === "system+") return false; // system ne peut pas toucher system+
-  if (actorType === "system" && targetModType === "system")  return false; // system ne peut pas toucher un autre system
+  if (actorType === "system+") return true;
+  if (actorType === "system" && targetModType === "system+") return false;
+  if (actorType === "system" && targetModType === "system")  return false;
   if (actorType === "moderator") {
     if (targetModType === "system+" || targetModType === "system") return false;
   }
@@ -182,7 +167,6 @@ function makeEmbed(color, description, fields = []) {
   return e;
 }
 
-/** Embed DM blacklist */
 function blDMEmbed(reason, modType, noReason) {
   const desc = (noReason || modType === "system+" || modType === "system")
     ? `Vous avez été **blacklisté** de **${CONFIG.SERVER_NAME}**.`
@@ -190,7 +174,6 @@ function blDMEmbed(reason, modType, noReason) {
   return makeEmbed(BLACK, desc).setFooter({ text: `${CONFIG.SERVER_NAME} • discord.gg/maledike` });
 }
 
-/** Embed DM ban */
 function banDMEmbed(reason, modType, noReason) {
   const desc = (noReason || modType === "system+" || modType === "system")
     ? `Vous avez été **banni** de **${CONFIG.SERVER_NAME}**.`
@@ -198,14 +181,12 @@ function banDMEmbed(reason, modType, noReason) {
   return makeEmbed(BLACK, desc).setFooter({ text: `${CONFIG.SERVER_NAME} • discord.gg/maledike` });
 }
 
-/** Label du modérateur selon son type pour l'affichage */
 function modDisplayName(modType, modId) {
   if (modType === "system+") return "system+";
   if (modType === "system")  return "system";
   return `<@${modId}>`;
 }
 
-/** Timestamp Discord formaté */
 function fmtDate(isoDate) {
   return isoDate ? `<t:${Math.floor(new Date(isoDate).getTime() / 1000)}:F>` : "Inconnue";
 }
@@ -220,7 +201,7 @@ async function sendDM(user, contentOrEmbed) {
     } else {
       await user.send({ embeds: [contentOrEmbed] });
     }
-  } catch { /* L'utilisateur a ses DM fermés, on ignore */ }
+  } catch { /* DM fermés */ }
 }
 
 // ─────────────────────────────────────────────
@@ -275,30 +256,26 @@ const client = new Client({
 });
 
 // ─────────────────────────────────────────────
-//  SLASH COMMANDS — DÉFINITION (SANS DOUBLON)
+//  SLASH COMMANDS — DÉFINITION
 // ─────────────────────────────────────────────
 const slashCommands = [
 
-  // ── /help ────────────────────────────────────
   new SlashCommandBuilder()
     .setName("help")
     .setDescription("Affiche toutes les commandes (System+ uniquement)"),
 
-  // ── /rank ────────────────────────────────────
   new SlashCommandBuilder()
     .setName("rank")
     .setDescription("Attribue un rôle à un membre")
     .addUserOption(o => o.setName("membre").setDescription("Membre à rank").setRequired(true))
     .addRoleOption(o => o.setName("role").setDescription("Rôle à attribuer").setRequired(true)),
 
-  // ── /derank ───────────────────────────────────
   new SlashCommandBuilder()
     .setName("derank")
     .setDescription("Retire tous les rôles d'un membre")
     .addUserOption(o => o.setName("membre").setDescription("Membre à derank").setRequired(true))
     .addStringOption(o => o.setName("raison").setDescription("Raison (optionnelle si autorisé)").setRequired(false)),
 
-  // ── /rankconfig ──────────────────────────────
   new SlashCommandBuilder()
     .setName("rankconfig")
     .setDescription("Configure les règles de rang (System+ uniquement)")
@@ -318,7 +295,6 @@ const slashCommands = [
     .addRoleOption(o => o.setName("role4").setDescription("Rôle lié supplémentaire").setRequired(false))
     .addRoleOption(o => o.setName("roleautorise").setDescription("Rôle autorisé à donner ce rang").setRequired(false)),
 
-  // ── OWNER BOT ────────────────────────────────
   new SlashCommandBuilder()
     .setName("ownerbot")
     .setDescription("Ajouter un Owner Bot / System+ (System+ uniquement)")
@@ -333,7 +309,6 @@ const slashCommands = [
     .setName("ownerbotlist")
     .setDescription("Liste des Owners Bot / System+ (System+ uniquement)"),
 
-  // ── BAN ──────────────────────────────────────
   new SlashCommandBuilder()
     .setName("ban")
     .setDescription("Bannir un membre du serveur")
@@ -351,7 +326,6 @@ const slashCommands = [
     .addUserOption(o => o.setName("membre").setDescription("Mentionner le membre").setRequired(false))
     .addStringOption(o => o.setName("id").setDescription("ID de l'utilisateur").setRequired(false)),
 
-  // ── BLACKLIST ─────────────────────────────────
   new SlashCommandBuilder()
     .setName("bl")
     .setDescription("Blacklister un utilisateur")
@@ -374,7 +348,6 @@ const slashCommands = [
     .addUserOption(o => o.setName("membre").setDescription("Mentionner le membre").setRequired(false))
     .addStringOption(o => o.setName("id").setDescription("ID de l'utilisateur").setRequired(false)),
 
-  // ── BLACKLIST RÔLE ────────────────────────────
   new SlashCommandBuilder()
     .setName("blr")
     .setDescription("Blackliste les rôles d'un utilisateur (il ne peut plus en avoir)")
@@ -392,13 +365,11 @@ const slashCommands = [
     .addUserOption(o => o.setName("membre").setDescription("Membre").setRequired(false))
     .addStringOption(o => o.setName("id").setDescription("ID").setRequired(false)),
 
-  // ── WAKEUP ────────────────────────────────────
   new SlashCommandBuilder()
     .setName("wakeup")
     .setDescription("Déplace un membre dans tous les vocaux pendant 20 secondes")
     .addUserOption(o => o.setName("membre").setDescription("Membre à wakeup").setRequired(true)),
 
-  // ── DOG ───────────────────────────────────────
   new SlashCommandBuilder()
     .setName("dog")
     .setDescription("Met un utilisateur en laisse (pseudo verrouillé, suit le maître en vocal)")
@@ -417,7 +388,6 @@ const slashCommands = [
     .setName("doglist")
     .setDescription("Liste de tous les chiens du serveur"),
 
-  // ── AYKOKEMANMANW ─────────────────────────────
   new SlashCommandBuilder()
     .setName("aykokemanmanw")
     .setDescription("Blacklist permanente (seul System+ peut révoquer)")
@@ -429,7 +399,6 @@ const slashCommands = [
     .addUserOption(o => o.setName("membre").setDescription("Utilisateur").setRequired(true))
     .addStringOption(o => o.setName("id").setDescription("ID").setRequired(false)),
 
-  // ── COUNIAMANMANW ─────────────────────────────
   new SlashCommandBuilder()
     .setName("couniamanmanw")
     .setDescription("Timeout 28 jours impossible à lever")
@@ -440,7 +409,6 @@ const slashCommands = [
     .setDescription("Retire le couniamanmanw d'un utilisateur")
     .addUserOption(o => o.setName("membre").setDescription("Utilisateur").setRequired(true)),
 
-  // ── SETTINGS BL ──────────────────────────────
   new SlashCommandBuilder()
     .setName("settingbl")
     .setDescription("Configurer qui peut utiliser la catégorie BL + limites")
@@ -456,7 +424,6 @@ const slashCommands = [
     .addUserOption(o => o.setName("utilisateur").setDescription("Utilisateur").setRequired(false))
     .addIntegerOption(o => o.setName("limite").setDescription("Nb max de BL en 30 minutes").setRequired(false)),
 
-  // ── SETTINGS BAN ─────────────────────────────
   new SlashCommandBuilder()
     .setName("settingban")
     .setDescription("Configurer qui peut utiliser la catégorie BAN + limites")
@@ -472,7 +439,6 @@ const slashCommands = [
     .addUserOption(o => o.setName("utilisateur").setDescription("Utilisateur").setRequired(false))
     .addIntegerOption(o => o.setName("limite").setDescription("Nb max de BAN en 15 minutes").setRequired(false)),
 
-  // ── SETTINGS DERANK ───────────────────────────
   new SlashCommandBuilder()
     .setName("settingderank")
     .setDescription("Configurer qui peut derank (avec/sans raison)")
@@ -488,7 +454,6 @@ const slashCommands = [
     .addRoleOption(o => o.setName("role").setDescription("Rôle").setRequired(false))
     .addUserOption(o => o.setName("utilisateur").setDescription("Utilisateur").setRequired(false)),
 
-  // ── SETTINGS WAKEUP ───────────────────────────
   new SlashCommandBuilder()
     .setName("settingwakeup")
     .setDescription("Configurer qui peut utiliser /wakeup")
@@ -502,7 +467,6 @@ const slashCommands = [
     .addRoleOption(o => o.setName("role").setDescription("Rôle").setRequired(false))
     .addUserOption(o => o.setName("utilisateur").setDescription("Utilisateur").setRequired(false)),
 
-  // ── SETTINGS DOGS ─────────────────────────────
   new SlashCommandBuilder()
     .setName("settingdogs")
     .setDescription("Configurer la catégorie DOG (qui peut dog + limite de laisses)")
@@ -518,12 +482,10 @@ const slashCommands = [
     .addUserOption(o => o.setName("utilisateur").setDescription("Utilisateur").setRequired(false))
     .addIntegerOption(o => o.setName("limite").setDescription("Nb max de laisses par maître").setRequired(false)),
 
-  // ── SETTINGS AYKOKEMANMANW ────────────────────
   new SlashCommandBuilder()
     .setName("settingsaykokemanmanw")
     .setDescription("Configuration aykokemanmanw (System+ uniquement)"),
 
-  // ── SETTINGS COUNIAMANMANW ────────────────────
   new SlashCommandBuilder()
     .setName("settingscouniamanmanw")
     .setDescription("Configurer qui peut utiliser /couniamanmanw + limite")
@@ -539,7 +501,6 @@ const slashCommands = [
     .addUserOption(o => o.setName("utilisateur").setDescription("Utilisateur").setRequired(false))
     .addIntegerOption(o => o.setName("limite").setDescription("Limite d'utilisation").setRequired(false)),
 
-  // ── SETTINGS MENOTTE ──────────────────────────
   new SlashCommandBuilder()
     .setName("settingmenotte")
     .setDescription("Configurer qui peut utiliser +menotte / +libre + limite")
@@ -555,12 +516,10 @@ const slashCommands = [
     .addUserOption(o => o.setName("utilisateur").setDescription("Utilisateur").setRequired(false))
     .addIntegerOption(o => o.setName("limite").setDescription("Limite").setRequired(false)),
 
-  // ── SETTINGS VINIW ────────────────────────────
   new SlashCommandBuilder()
     .setName("settingviniw")
     .setDescription("Configuration viniw (System+ uniquement)"),
 
-  // ── SETTINGS SYSTEM ───────────────────────────
   new SlashCommandBuilder()
     .setName("settingsystem")
     .setDescription("Configurer les rôles/users avec le statut System")
@@ -577,18 +536,26 @@ const slashCommands = [
 ].map(c => c.toJSON());
 
 // ─────────────────────────────────────────────
-//  READY — Déploiement des commandes
+//  REST
 // ─────────────────────────────────────────────
 const rest = new REST({ version: "10" }).setToken(BOT_TOKEN);
 
+// ─────────────────────────────────────────────
+//  READY — Déploiement des commandes (SANS DOUBLONS)
+// ─────────────────────────────────────────────
 client.once("ready", async () => {
   console.log(`✅ Bot connecté : ${client.user.tag}`);
   try {
+    // 1) Purge des commandes globales (source des doublons)
+    await rest.put(Routes.applicationCommands(CONFIG.CLIENT_ID), { body: [] });
+    console.log("✅ Commandes globales purgées.");
+
+    // 2) Enregistrement uniquement sur le serveur cible
     await rest.put(
       Routes.applicationGuildCommands(CONFIG.CLIENT_ID, CONFIG.GUILD_ID),
       { body: slashCommands }
     );
-    console.log(`✅ ${slashCommands.length} commandes slash déployées.`);
+    console.log(`✅ ${slashCommands.length} commandes slash déployées sur le serveur.`);
   } catch (err) {
     console.error("❌ Erreur déploiement:", err.message);
   }
@@ -603,7 +570,6 @@ client.once("ready", async () => {
 //  GUILD MEMBER ADD — vérif blacklist + aykokemanmanw
 // ─────────────────────────────────────────────
 client.on(Events.GuildMemberAdd, async (member) => {
-  // Vérif blacklist normale
   const bl = store.blacklist.get(member.id);
   if (bl) {
     await sendDM(member.user, new EmbedBuilder()
@@ -615,7 +581,6 @@ client.on(Events.GuildMemberAdd, async (member) => {
     return;
   }
 
-  // Vérif aykokemanmanw
   const ayko = store.aykokemanmanw.get(member.id);
   if (ayko) {
     await sendDM(member.user, new EmbedBuilder()
@@ -627,7 +592,6 @@ client.on(Events.GuildMemberAdd, async (member) => {
     return;
   }
 
-  // Restituer le lockname si en laisse (dog)
   const dog = store.dogs.get(member.id);
   if (dog) {
     const master = await member.guild.members.fetch(dog.masterId).catch(() => null);
@@ -646,12 +610,10 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
   const lockedName = store.locknames.get(newMember.id);
   if (!lockedName) return;
 
-  // Si le pseudo change et n'est pas le pseudo verrouillé → le remettre
   if (newMember.nickname !== lockedName) {
     try { await newMember.setNickname(lockedName, "Dog lock — pseudo verrouillé"); } catch {}
   }
 
-  // Si quelqu'un essaie de lui donner un rôle et qu'il est en BLR → le retirer immédiatement
   if (store.blr.has(newMember.id)) {
     const addedRoles = newMember.roles.cache.filter(r =>
       r.id !== newMember.guild.id && !oldMember.roles.cache.has(r.id)
@@ -663,64 +625,40 @@ client.on(Events.GuildMemberUpdate, async (oldMember, newMember) => {
 });
 
 // ─────────────────────────────────────────────
-//  VOICE STATE UPDATE — Dog suit le maître
-//                     — Menotte retient la victime
+//  VOICE STATE UPDATE — Dog suit le maître / Menotte
 // ─────────────────────────────────────────────
 client.on(Events.VoiceStateUpdate, async (oldState, newState) => {
   const guild = newState.guild || oldState.guild;
 
-  // ── DOG : la victime suit son maître en vocal ──
-  // Quand le MAÎTRE change de channel, tous ses chiens le suivent
   if (newState.channelId !== oldState.channelId && newState.member) {
     const masterId = newState.member.id;
-    // Cherche tous les chiens de ce maître
     for (const [dogId, dogData] of store.dogs.entries()) {
       if (dogData.masterId !== masterId) continue;
       const dogMember = await guild.members.fetch(dogId).catch(() => null);
       if (!dogMember?.voice?.channel) continue;
       if (newState.channelId) {
-        // Le maître rejoint un vocal → le chien le suit
         try { await dogMember.voice.setChannel(newState.channelId, "Dog — suit le maître"); } catch {}
-      } else {
-        // Le maître quitte → le chien ne fait rien (pas de déconnexion forcée)
       }
     }
   }
 
-  // ── MENOTTE : la victime ne peut pas quitter son channel ──
   if (newState.member) {
     const menotte = store.menottes.get(newState.member.id);
     if (menotte) {
       const lockedChannelId = menotte.channelId;
-      // Si le membre change de channel ou se reconnecte ailleurs → le ramener
       if (newState.channelId && newState.channelId !== lockedChannelId) {
         setTimeout(async () => {
-          try {
-            await newState.member.voice.setChannel(lockedChannelId, "Menotte active");
-          } catch {}
+          try { await newState.member.voice.setChannel(lockedChannelId, "Menotte active"); } catch {}
         }, 300);
-      } else if (!newState.channelId && oldState.channelId) {
-        // Se déconnecte → essaie de le remettre (peut échouer si pas connecté)
-        setTimeout(async () => {
-          try {
-            const m = await guild.members.fetch(newState.member.id).catch(() => null);
-            if (m?.voice?.channel) return; // déjà reconnecté quelque part
-            // On ne peut pas forcer la reconnexion si le membre est offline vocal
-          } catch {}
-        }, 2000);
       }
     }
   }
-
-  // ── COUNIAMANMANW : re-timeout si quelqu'un essaie de lever ──
-  // (géré dans l'event guildAuditLogEntryCreate)
 });
 
 // ─────────────────────────────────────────────
-//  AUDIT LOG — Détection tentative de lever timeout couniamanmanw
+//  AUDIT LOG — Re-timeout couniamanmanw si quelqu'un essaie de le lever
 // ─────────────────────────────────────────────
 client.on(Events.GuildAuditLogEntryCreate, async (entry, guild) => {
-  // Type 24 = MEMBER_UPDATE (timeout modifié)
   if (entry.action !== 24) return;
   const targetId = entry.target?.id;
   if (!targetId) return;
@@ -728,24 +666,18 @@ client.on(Events.GuildAuditLogEntryCreate, async (entry, guild) => {
   const cmw = store.couniamanmanw.get(targetId);
   if (!cmw) return;
 
-  // Quelqu'un a essayé de toucher au timeout d'une personne en couniamanmanw
   const executorId = entry.executor?.id;
   if (!executorId || executorId === CONFIG.CLIENT_ID) return;
-
-  // Si c'est system+ qui a exécuté, on ne re-punit pas
   if (isSystemPlus(executorId)) return;
 
-  const executor  = await guild.members.fetch(executorId).catch(() => null);
+  const executor    = await guild.members.fetch(executorId).catch(() => null);
   const cmwExecutor = cmw.executorId;
 
-  // System peut toucher sauf si c'est system+ qui a fait le couniamanmanw
   if (executor && isSystem(executor) && !isSystemPlus(cmwExecutor)) return;
 
-  // Alerte + re-timeout de la victime
   const targetMember = await guild.members.fetch(targetId).catch(() => null);
   if (targetMember) {
-    const timeoutEnd = new Date(cmw.timeoutEnd);
-    const now        = Date.now();
+    const now = Date.now();
     if (now < cmw.timeoutEnd) {
       const remaining = cmw.timeoutEnd - now;
       try {
@@ -754,7 +686,6 @@ client.on(Events.GuildAuditLogEntryCreate, async (entry, guild) => {
     }
   }
 
-  // Prévenir l'exécuteur qui a tenté de toucher
   if (executor) {
     await sendDM(executor.user, new EmbedBuilder()
       .setColor(BLACK)
@@ -764,25 +695,24 @@ client.on(Events.GuildAuditLogEntryCreate, async (entry, guild) => {
 });
 
 // ─────────────────────────────────────────────
-//  MESSAGE CREATE — Commandes avec préfixe +
+//  MESSAGE CREATE — Commandes préfixe +
 // ─────────────────────────────────────────────
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
   if (!message.guild)     return;
   if (!message.content.startsWith("+")) return;
 
-  const args    = message.content.slice(1).trim().split(/\s+/);
-  const cmd     = args.shift().toLowerCase();
-  const guild   = message.guild;
-  const member  = message.member;
+  const args   = message.content.slice(1).trim().split(/\s+/);
+  const cmd    = args.shift().toLowerCase();
+  const guild  = message.guild;
+  const member = message.member;
 
-  // Helper reply pour les commandes prefix
   const prefixReply = async (embed) => {
     try { await message.reply({ embeds: [embed] }); } catch {}
   };
 
   // ════════════════════════════════════════════
-  //  +bl @victime raison:...
+  //  +bl
   // ════════════════════════════════════════════
   if (cmd === "bl") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "bl"))
@@ -792,21 +722,18 @@ client.on(Events.MessageCreate, async (message) => {
     if (!rateCheck.allowed)
       return prefixReply(makeEmbed(RED, `❌ Limite atteinte. Réessaie dans **${rateCheck.remaining} minutes**.`));
 
-    // Extraire mention ou ID
-    const mention = message.mentions.users.first();
-    const rawArg  = args[0];
+    const mention  = message.mentions.users.first();
+    const rawArg   = args[0];
     const targetId = mention?.id || (rawArg && /^\d{17,20}$/.test(rawArg) ? rawArg : null);
 
     if (!targetId)
       return prefixReply(makeEmbed(RED, "❌ Mentionne une victime : `+bl @victime raison: ...`"));
 
-    // Extraire la raison (après "raison:" ou juste les mots restants)
-    const full    = args.slice(mention ? 0 : 1).join(" ");
+    const full        = args.slice(mention ? 0 : 1).join(" ");
     const raisonMatch = full.match(/raison\s*:\s*(.+)/i);
-    const modType = getModType(member);
-    let raison    = raisonMatch ? raisonMatch[1].trim() : (isSystemPlus(member.id) || isSystem(member) ? null : null);
+    const modType     = getModType(member);
+    let raison        = raisonMatch ? raisonMatch[1].trim() : null;
 
-    // System+ et system peuvent bl sans raison
     if (!raison && !isSystemPlus(member.id) && !isSystem(member))
       return prefixReply(makeEmbed(RED, "❌ Fournis une raison : `+bl @victime raison: <raison>`"));
 
@@ -827,7 +754,6 @@ client.on(Events.MessageCreate, async (message) => {
       try { await targetMember.kick(`[Blacklist] ${raison}`); } catch {}
     }
 
-    // Message privé à l'exécuteur (confirmation)
     await sendDM(member.user, makeEmbed(BLACK, `✓ **${target.tag}** a été blacklisté de **${CONFIG.SERVER_NAME}**.`));
 
     return prefixReply(new EmbedBuilder()
@@ -841,7 +767,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   // ════════════════════════════════════════════
-  //  +unbl @user ou ID
+  //  +unbl
   // ════════════════════════════════════════════
   if (cmd === "unbl") {
     const mention  = message.mentions.users.first();
@@ -855,7 +781,6 @@ client.on(Events.MessageCreate, async (message) => {
     if (!blData)
       return prefixReply(makeEmbed(DARK, "Cet utilisateur n'est pas dans la blacklist."));
 
-    // Vérifier les droits de suppression
     if (blData.modType === "system+") {
       if (!isSystemPlus(member.id))
         return prefixReply(makeEmbed(RED, "❌ Seul un **System+** peut retirer une blacklist posée par un System+."));
@@ -873,7 +798,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   // ════════════════════════════════════════════
-  //  +ban @user raison: ...
+  //  +ban
   // ════════════════════════════════════════════
   if (cmd === "ban") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "ban"))
@@ -890,10 +815,10 @@ client.on(Events.MessageCreate, async (message) => {
     if (!targetId)
       return prefixReply(makeEmbed(RED, "❌ Usage : `+ban @user raison: <raison>`"));
 
-    const full         = args.slice(mention ? 0 : 1).join(" ");
-    const raisonMatch  = full.match(/raison\s*:\s*(.+)/i);
-    const modType      = getModType(member);
-    let raison         = raisonMatch ? raisonMatch[1].trim() : null;
+    const full        = args.slice(mention ? 0 : 1).join(" ");
+    const raisonMatch = full.match(/raison\s*:\s*(.+)/i);
+    const modType     = getModType(member);
+    let raison        = raisonMatch ? raisonMatch[1].trim() : null;
 
     if (!raison && !isSystemPlus(member.id) && !isSystem(member))
       return prefixReply(makeEmbed(RED, "❌ Fournis une raison : `+ban @user raison: <raison>`"));
@@ -926,7 +851,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   // ════════════════════════════════════════════
-  //  +unban <ID>
+  //  +unban
   // ════════════════════════════════════════════
   if (cmd === "unban") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "ban"))
@@ -945,7 +870,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   // ════════════════════════════════════════════
-  //  +baninfo @user ou ID
+  //  +baninfo
   // ════════════════════════════════════════════
   if (cmd === "baninfo") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "ban"))
@@ -969,32 +894,18 @@ client.on(Events.MessageCreate, async (message) => {
 
     return prefixReply(new EmbedBuilder()
       .setColor(BLACK)
-      .setDescription(
-        `╭───────────────\n│ 📄 Rapport BAN INFO\n╰───────────────`
-      )
+      .setDescription(`╭───────────────\n│ 📄 Rapport BAN INFO\n╰───────────────`)
       .addFields(
-        {
-          name:  "👤 Utilisateur",
-          value: `• Pseudo : ${u ? `<@${u.id}>` : `\`${targetId}\``}\n• Identifiant : \`${targetId}\``,
-        },
-        {
-          name:  "📝 Motif",
-          value: banData?.reason || guildBan?.reason || "Inconnue",
-        },
-        {
-          name:  "👮 Traitement",
-          value: `• Modérateur : ${banData ? modDisplayName(banData.modType, banData.modId) : "Inconnu"}\n• Identifiant : \`${banData?.modId || "?"}\``,
-        },
-        {
-          name:  "📅 Date",
-          value: `• ${fmtDate(banData?.date)}`,
-        },
+        { name: "👤 Utilisateur", value: `• Pseudo : ${u ? `<@${u.id}>` : `\`${targetId}\``}\n• Identifiant : \`${targetId}\`` },
+        { name: "📝 Motif",       value: banData?.reason || guildBan?.reason || "Inconnue" },
+        { name: "👮 Traitement",  value: `• Modérateur : ${banData ? modDisplayName(banData.modType, banData.modId) : "Inconnu"}\n• Identifiant : \`${banData?.modId || "?"}\`` },
+        { name: "📅 Date",        value: `• ${fmtDate(banData?.date)}` },
       )
     );
   }
 
   // ════════════════════════════════════════════
-  //  +derank @user (ou ID)
+  //  +derank
   // ════════════════════════════════════════════
   if (cmd === "derank") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "derank"))
@@ -1006,7 +917,6 @@ client.on(Events.MessageCreate, async (message) => {
 
     if (!targetId)
       return prefixReply(makeEmbed(RED, "❌ Usage : `+derank @user`"));
-
     if (isSystemPlus(targetId))
       return prefixReply(makeEmbed(RED, "❌ Impossible de derank un System+."));
 
@@ -1014,17 +924,13 @@ client.on(Events.MessageCreate, async (message) => {
     if (!targetMember)
       return prefixReply(makeEmbed(RED, "❌ Ce membre n'est pas sur le serveur."));
 
-    // Extraire raison optionnelle
-    const full  = args.slice(mention ? 0 : 1).join(" ").trim();
+    const full   = args.slice(mention ? 0 : 1).join(" ").trim();
     const raison = full || null;
-
     const modType = getModType(member);
 
-    // System ne peut pas derank quelqu'un que system+ a bl/protégé
     if (!canActOn(member, modType))
       return prefixReply(makeEmbed(RED, "❌ Vous ne pouvez pas agir sur cet utilisateur."));
 
-    // Si pas de raison et pas autorisé à derank sans raison
     if (!raison && !isSystemPlus(member.id) && !isSystem(member) && !hasPerm(member, "derank_no_reason"))
       return prefixReply(makeEmbed(RED, "❌ Fournis une raison pour `+derank`."));
 
@@ -1035,8 +941,6 @@ client.on(Events.MessageCreate, async (message) => {
       .join(", ") || "Aucun";
 
     await totalDerank(targetMember);
-
-    // DM embed noir à la victime
     await sendDM(targetMember.user, new EmbedBuilder()
       .setColor(BLACK)
       .setDescription(`Vous avez été **derank** sur **${CONFIG.SERVER_NAME}**.`)
@@ -1047,14 +951,14 @@ client.on(Events.MessageCreate, async (message) => {
       .setDescription(`✓ <@${targetId}> a été totalement derank.`)
       .addFields(
         { name: "Rôles retirés", value: rolesBefore.slice(0, 1024) },
-        { name: "Par",    value: `<@${member.id}>`,   inline: true },
-        { name: "Raison", value: raison || "—",        inline: true },
+        { name: "Par",    value: `<@${member.id}>`, inline: true },
+        { name: "Raison", value: raison || "—",     inline: true },
       )
     );
   }
 
   // ════════════════════════════════════════════
-  //  +menotte @user IDchannel
+  //  +menotte
   // ════════════════════════════════════════════
   if (cmd === "menotte") {
     if (!isSystemPlus(member.id) && !isSystem(member) && !hasPerm(member, "menotte"))
@@ -1068,17 +972,14 @@ client.on(Events.MessageCreate, async (message) => {
     if (!targetId || !channelId)
       return prefixReply(makeEmbed(RED, "❌ Usage : `+menotte @user <IDchannel>`"));
 
-    // Pas applicable sur system+ ni system
     const targetMember = await guild.members.fetch(targetId).catch(() => null);
     if (!targetMember)
       return prefixReply(makeEmbed(RED, "❌ Ce membre n'est pas sur le serveur."));
-
     if (isSystemPlus(targetId))
       return prefixReply(makeEmbed(RED, "❌ Impossible de mettre en menotte un System+."));
     if (isSystem(targetMember) && !isSystemPlus(member.id))
       return prefixReply(makeEmbed(RED, "❌ Impossible de mettre en menotte un System."));
 
-    // Vérif channel vocal
     const channel = guild.channels.cache.get(channelId);
     if (!channel || !channel.isVoiceBased())
       return prefixReply(makeEmbed(RED, "❌ L'ID du channel doit être un salon vocal valide."));
@@ -1089,7 +990,6 @@ client.on(Events.MessageCreate, async (message) => {
 
     store.menottes.set(targetId, { executorId: member.id, channelId, date: new Date().toISOString() });
 
-    // Forcer le déplacement immédiat si le membre est en vocal
     if (targetMember.voice.channel) {
       try { await targetMember.voice.setChannel(channelId, "Menotte"); } catch {}
     }
@@ -1098,7 +998,7 @@ client.on(Events.MessageCreate, async (message) => {
   }
 
   // ════════════════════════════════════════════
-  //  +libre @user — libère la menotte
+  //  +libre
   // ════════════════════════════════════════════
   if (cmd === "libre") {
     const mention  = message.mentions.users.first();
@@ -1111,7 +1011,6 @@ client.on(Events.MessageCreate, async (message) => {
     if (!menotte)
       return prefixReply(makeEmbed(DARK, "Cet utilisateur n'est pas en menotte."));
 
-    // Seul celui qui a mis la menotte peut la retirer (bypass system+ et system)
     if (!isSystemPlus(member.id) && !isSystem(member) && menotte.executorId !== member.id)
       return prefixReply(makeEmbed(RED, "❌ Seul celui qui a mis la menotte peut la retirer."));
 
@@ -1128,14 +1027,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   const { commandName, member, guild } = interaction;
 
-  // Helper reply embed
   const reply = (color, desc, fields = [], ephemeral = false) => {
     const e = makeEmbed(color, desc, fields);
     return interaction.reply({ embeds: [e], ephemeral });
   };
 
   // ════════════════════════════════════════════
-  //  /help — System+ uniquement
+  //  /help
   // ════════════════════════════════════════════
   if (commandName === "help") {
     if (!isSystemPlus(member.id))
@@ -1147,46 +1045,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
         .setTitle("╸ Commandes Maledike")
         .setDescription("discord.gg/maledike")
         .addFields(
-          {
-            name: "🎖️ Rangs",
-            value: "`/rank` — Attribue un rôle\n`/derank` `+derank` — Retire tous les rôles",
-          },
-          {
-            name: "🔨 Ban",
-            value: "`/ban` `+ban` — Bannir\n`/unban` `+unban` — Débannir\n`/baninfo` `+baninfo` — Infos",
-          },
-          {
-            name: "🚫 Blacklist",
-            value: "`/bl` `+bl` — Blacklister\n`/unbl` `+unbl` — Retirer\n`/blist` — Liste\n`/blinfo` — Infos",
-          },
-          {
-            name: "🎭 Blacklist Rôle",
-            value: "`/blr` — BLR\n`/unblr` — Retirer BLR\n`/blrinfo` — Infos",
-          },
-          {
-            name: "💤 Wakeup",
-            value: "`/wakeup` — Déplace dans tous les vocaux 20s",
-          },
-          {
-            name: "🐕 Dog",
-            value: "`/dog` — Mettre en laisse\n`/undog` — Enlever laisse\n`/undogalls` — Enlever toutes les laisses\n`/doglist` — Liste",
-          },
-          {
-            name: "☠️ Spécial",
-            value: "`/aykokemanmanw` — BL permanente\n`/viniw` — Retire aykokemanmanw\n`/couniamanmanw` — Timeout 28j\n`/uncouniamanmanw` — Retire",
-          },
-          {
-            name: "⛓️ Menotte",
-            value: "`+menotte @user IDchannel` — Menotte\n`+libre @user` — Libère",
-          },
-          {
-            name: "👑 Owner Bot / System+",
-            value: "`/ownerbot` `/unownerbot` `/ownerbotlist`",
-          },
-          {
-            name: "⚙️ Configuration System+",
-            value: "`/settingbl` `/settingban` `/settingderank` `/settingwakeup`\n`/settingdogs` `/settingsaykokemanmanw` `/settingscouniamanmanw`\n`/settingmenotte` `/settingviniw` `/settingsystem`\n`/rankconfig`",
-          },
+          { name: "🎖️ Rangs",        value: "`/rank` — Attribue un rôle\n`/derank` `+derank` — Retire tous les rôles" },
+          { name: "🔨 Ban",           value: "`/ban` `+ban` — Bannir\n`/unban` `+unban` — Débannir\n`/baninfo` `+baninfo` — Infos" },
+          { name: "🚫 Blacklist",     value: "`/bl` `+bl` — Blacklister\n`/unbl` `+unbl` — Retirer\n`/blist` — Liste\n`/blinfo` — Infos" },
+          { name: "🎭 Blacklist Rôle",value: "`/blr` — BLR\n`/unblr` — Retirer BLR\n`/blrinfo` — Infos" },
+          { name: "💤 Wakeup",        value: "`/wakeup` — Déplace dans tous les vocaux 20s" },
+          { name: "🐕 Dog",           value: "`/dog` — Mettre en laisse\n`/undog` — Enlever laisse\n`/undogalls` — Enlever toutes les laisses\n`/doglist` — Liste" },
+          { name: "☠️ Spécial",       value: "`/aykokemanmanw` — BL permanente\n`/viniw` — Retire aykokemanmanw\n`/couniamanmanw` — Timeout 28j\n`/uncouniamanmanw` — Retire" },
+          { name: "⛓️ Menotte",       value: "`+menotte @user IDchannel` — Menotte\n`+libre @user` — Libère" },
+          { name: "👑 Owner Bot",      value: "`/ownerbot` `/unownerbot` `/ownerbotlist`" },
+          { name: "⚙️ Configuration", value: "`/settingbl` `/settingban` `/settingderank` `/settingwakeup`\n`/settingdogs` `/settingsaykokemanmanw` `/settingscouniamanmanw`\n`/settingmenotte` `/settingviniw` `/settingsystem`\n`/rankconfig`" },
         )
         .setFooter({ text: "Maledike • discord.gg/maledike" })
     ], ephemeral: true });
@@ -1236,8 +1104,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
           )
           .addFields(
             { name: "Rôles actuels", value: rolesAfter.slice(0, 1024) },
-            { name: "Par",           value: `<@${member.id}>`,       inline: true },
-            { name: "Rôle attribué", value: `<@&${role.id}>`,        inline: true },
+            { name: "Par",           value: `<@${member.id}>`,   inline: true },
+            { name: "Rôle attribué", value: `<@&${role.id}>`,    inline: true },
           )
       ]});
     } catch (err) {
@@ -1260,8 +1128,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return reply(RED, "❌ Impossible de derank un System+.", [], true);
     if (!targetMember)
       return reply(RED, "❌ Ce membre n'est pas sur le serveur.", [], true);
-
-    // Vérif raison (obligatoire sauf system+ / system / perm_no_reason)
     if (!raison && !isSystemPlus(member.id) && !isSystem(member) && !hasPerm(member, "derank_no_reason"))
       return reply(RED, "❌ Vous devez fournir une raison.", [], true);
 
@@ -1272,8 +1138,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       .join(", ") || "Aucun";
 
     await totalDerank(targetMember);
-
-    // DM embed noir simple
     await sendDM(targetUser, new EmbedBuilder()
       .setColor(BLACK)
       .setDescription(`Vous avez été **derank** sur **${CONFIG.SERVER_NAME}**.`)
@@ -1291,7 +1155,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /rankconfig — System+ uniquement
+  //  /rankconfig
   // ════════════════════════════════════════════
   if (commandName === "rankconfig") {
     if (!isSystemPlus(member.id))
@@ -1305,8 +1169,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const roleAutorise = interaction.options.getRole("roleautorise");
 
     if (action === "show") {
-      if (CONFIG.RANK_CONFIG.length === 0)
-        return reply(DARK, "Aucune règle configurée.");
+      if (CONFIG.RANK_CONFIG.length === 0) return reply(DARK, "Aucune règle configurée.");
       const lines = CONFIG.RANK_CONFIG.map((r, i) => {
         const name    = guild.roles.cache.get(r.rankRole)?.name || r.rankRole;
         const ceiling = r.maxRole ? `<@&${r.maxRole}>` : "Aucun";
@@ -1318,7 +1181,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
         new EmbedBuilder().setColor(DARK).setTitle("📋 Règles de rang").setDescription(lines.join("\n\n"))
       ], ephemeral: true });
     }
-
     if (action === "add") {
       if (!role) return reply(RED, "Sélectionne un rôle avec `role`.", [], true);
       if (CONFIG.RANK_CONFIG.find(r => r.rankRole === role.id))
@@ -1326,7 +1188,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       CONFIG.RANK_CONFIG.push({ rankRole: role.id, assignRoles: [], maxRole: null, allowedRoles: [] });
       return reply(DARK, `✓ Règle créée pour **${role.name}**.`);
     }
-
     if (action === "remove") {
       if (!role) return reply(RED, "Sélectionne le rôle avec `role`.", [], true);
       const idx = CONFIG.RANK_CONFIG.findIndex(r => r.rankRole === role.id);
@@ -1334,7 +1195,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       CONFIG.RANK_CONFIG.splice(idx, 1);
       return reply(DARK, `✓ Règle supprimée pour **${role.name}**.`);
     }
-
     if (action === "setceiling") {
       if (!role || !role2) return reply(RED, "`role` = le rang — `role2` = le plafond max.", [], true);
       let rule = CONFIG.RANK_CONFIG.find(r => r.rankRole === role.id);
@@ -1342,7 +1202,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       rule.maxRole = role2.id;
       return reply(DARK, `✓ Plafond : **${role.name}** ne peut pas dépasser **${role2.name}**.`);
     }
-
     if (action === "linkroles") {
       if (!role) return reply(RED, "Sélectionne le rôle principal avec `role`.", [], true);
       let rule = CONFIG.RANK_CONFIG.find(r => r.rankRole === role.id);
@@ -1352,7 +1211,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       for (const r of toLink) if (!rule.assignRoles.includes(r.id)) rule.assignRoles.push(r.id);
       return reply(DARK, `✓ Rôles liés à **${role.name}** : ${toLink.map(r => `<@&${r.id}>`).join(", ")}`);
     }
-
     if (action === "setallowed") {
       if (!role || !roleAutorise) return reply(RED, "`role` = le rang — `roleautorise` = qui peut le donner.", [], true);
       let rule = CONFIG.RANK_CONFIG.find(r => r.rankRole === role.id);
@@ -1360,7 +1218,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (!rule.allowedRoles.includes(roleAutorise.id)) rule.allowedRoles.push(roleAutorise.id);
       return reply(DARK, `✓ **${roleAutorise.name}** peut maintenant rank **${role.name}**.`);
     }
-
     return reply(RED, "Action inconnue.", [], true);
   }
 
@@ -1415,7 +1272,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const target      = interaction.options.getUser("membre");
     const raisonInput = interaction.options.getString("raison");
     const modType     = getModType(member);
-    let   raison      = raisonInput;
+    let raison        = raisonInput;
 
     if (!raison && !isSystemPlus(member.id) && !isSystem(member))
       return reply(RED, "❌ Vous devez fournir une raison pour bannir.", [], true);
@@ -1469,7 +1326,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const targetUser = interaction.options.getUser("membre");
     const targetId   = interaction.options.getString("id") || targetUser?.id;
-
     if (!targetId) return reply(RED, "❌ Mentionne un membre ou fournis un ID.", [], true);
 
     const banData = store.bans.get(targetId);
@@ -1478,30 +1334,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     if (!banData && !guildBan) return reply(DARK, "Cet utilisateur n'est pas banni.");
 
     const u = await client.users.fetch(targetId).catch(() => null);
-
     return interaction.reply({ embeds: [
-      new EmbedBuilder()
-        .setColor(BLACK)
+      new EmbedBuilder().setColor(BLACK)
         .setDescription("╭───────────────\n│ 📄 Rapport BAN INFO\n╰───────────────")
         .addFields(
-          {
-            name:  "👤 Utilisateur",
-            value: `• Pseudo : ${u ? `<@${u.id}>` : `\`${targetId}\``}\n• Identifiant : \`${targetId}\``,
-          },
-          {
-            name:  "📝 Motif",
-            value: banData?.reason || guildBan?.reason || "Inconnue",
-          },
-          {
-            name:  "👮 Traitement",
-            value: banData
-              ? `• Modérateur : ${modDisplayName(banData.modType, banData.modId)}\n• Identifiant : \`${banData.modId}\``
-              : "• Inconnu",
-          },
-          {
-            name:  "📅 Date",
-            value: `• ${fmtDate(banData?.date)}`,
-          },
+          { name: "👤 Utilisateur", value: `• Pseudo : ${u ? `<@${u.id}>` : `\`${targetId}\``}\n• Identifiant : \`${targetId}\`` },
+          { name: "📝 Motif",       value: banData?.reason || guildBan?.reason || "Inconnue" },
+          { name: "👮 Traitement",  value: banData ? `• Modérateur : ${modDisplayName(banData.modType, banData.modId)}\n• Identifiant : \`${banData.modId}\`` : "• Inconnu" },
+          { name: "📅 Date",        value: `• ${fmtDate(banData?.date)}` },
         )
     ], ephemeral: true });
   }
@@ -1522,11 +1362,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const targetId    = targetUser?.id || rawId;
     const raisonInput = interaction.options.getString("raison");
     const modType     = getModType(member);
-    let   raison      = raisonInput;
+    let raison        = raisonInput;
 
     if (!targetId)
       return reply(RED, "❌ Mentionne un membre avec `membre` ou fournis un `id`.", [], true);
-
     if (!raison && !isSystemPlus(member.id) && !isSystem(member))
       return reply(RED, "❌ Vous devez fournir une raison.", [], true);
 
@@ -1561,9 +1400,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "unbl") {
     const id     = interaction.options.getString("id");
     const blData = store.blacklist.get(id);
-
-    if (!blData)
-      return reply(DARK, "Cet utilisateur n'est pas dans la blacklist.");
+    if (!blData) return reply(DARK, "Cet utilisateur n'est pas dans la blacklist.");
 
     if (blData.modType === "system+") {
       if (!isSystemPlus(member.id))
@@ -1587,9 +1424,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "blist") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "bl"))
       return reply(RED, "❌ Permission refusée.", [], true);
-
-    if (!store.blacklist.size)
-      return reply(DARK, "Aucun utilisateur blacklisté.");
+    if (!store.blacklist.size) return reply(DARK, "Aucun utilisateur blacklisté.");
 
     const lines = [];
     for (const [id, data] of store.blacklist.entries()) {
@@ -1604,7 +1439,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /blinfo — Embed formaté
+  //  /blinfo
   // ════════════════════════════════════════════
   if (commandName === "blinfo") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "bl"))
@@ -1612,45 +1447,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const targetUser = interaction.options.getUser("membre");
     const targetId   = interaction.options.getString("id") || targetUser?.id;
-
-    if (!targetId)
-      return reply(RED, "❌ Mentionne un membre ou fournis un ID.", [], true);
+    if (!targetId) return reply(RED, "❌ Mentionne un membre ou fournis un ID.", [], true);
 
     const blData = store.blacklist.get(targetId);
-    if (!blData)
-      return reply(DARK, "Cet utilisateur n'est pas dans la blacklist.");
+    if (!blData) return reply(DARK, "Cet utilisateur n'est pas dans la blacklist.");
 
     const u = await client.users.fetch(targetId).catch(() => null);
-
     return interaction.reply({ embeds: [
-      new EmbedBuilder()
-        .setColor(BLACK)
+      new EmbedBuilder().setColor(BLACK)
         .setDescription("╭───────────────\n│ 📄 Rapport BL INFO\n╰───────────────")
         .addFields(
-          {
-            name:  "👤 Utilisateur",
-            value: blData.modType === "system+" || blData.modType === "system"
-              ? `• Pseudo : par un ${blData.modType}\n• Identifiant : \`${targetId}\``
-              : `• Pseudo : ${u ? `<@${u.id}>` : `\`${targetId}\``}\n• Identifiant : \`${targetId}\``,
-          },
-          {
-            name:  "📝 Motif",
-            value: blData.reason,
-          },
-          {
-            name:  "👮 Traitement",
-            value: `• Modérateur : ${modDisplayName(blData.modType, blData.modId)}\n• Identifiant : \`${blData.modId}\``,
-          },
-          {
-            name:  "📅 Date",
-            value: `• ${fmtDate(blData.date)}`,
-          },
+          { name: "👤 Utilisateur", value: blData.modType === "system+" || blData.modType === "system" ? `• Pseudo : par un ${blData.modType}\n• Identifiant : \`${targetId}\`` : `• Pseudo : ${u ? `<@${u.id}>` : `\`${targetId}\``}\n• Identifiant : \`${targetId}\`` },
+          { name: "📝 Motif",       value: blData.reason },
+          { name: "👮 Traitement",  value: `• Modérateur : ${modDisplayName(blData.modType, blData.modId)}\n• Identifiant : \`${blData.modId}\`` },
+          { name: "📅 Date",        value: `• ${fmtDate(blData.date)}` },
         )
     ], ephemeral: true });
   }
 
   // ════════════════════════════════════════════
-  //  /blr — Blacklist Rôle
+  //  /blr
   // ════════════════════════════════════════════
   if (commandName === "blr") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "blr"))
@@ -1660,14 +1476,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const raison       = interaction.options.getString("raison");
     const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
 
-    if (!targetMember)
-      return reply(RED, "❌ Ce membre n'est pas sur le serveur.", [], true);
-    if (isSystemPlus(targetUser.id))
-      return reply(RED, "❌ Impossible de BLR un System+.", [], true);
+    if (!targetMember) return reply(RED, "❌ Ce membre n'est pas sur le serveur.", [], true);
+    if (isSystemPlus(targetUser.id)) return reply(RED, "❌ Impossible de BLR un System+.", [], true);
 
     store.blr.set(targetUser.id, { reason: raison, modId: member.id, date: new Date().toISOString() });
-
-    // Retirer tous ses rôles actuels
     await totalDerank(targetMember);
 
     return interaction.reply({ embeds: [
@@ -1689,11 +1501,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const targetUser = interaction.options.getUser("membre");
     const blrData    = store.blr.get(targetUser.id);
+    if (!blrData) return reply(DARK, "Cet utilisateur n'est pas en Blacklist Rôle.");
 
-    if (!blrData)
-      return reply(DARK, "Cet utilisateur n'est pas en Blacklist Rôle.");
-
-    // Vérification hiérarchie
     if (!canActOn(member, getModType({ id: blrData.modId, roles: { cache: new Map() } })))
       return reply(RED, "❌ Vous ne pouvez pas retirer un BLR posé par quelqu'un de supérieur.", [], true);
 
@@ -1710,81 +1519,56 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
     const targetUser = interaction.options.getUser("membre");
     const targetId   = interaction.options.getString("id") || targetUser?.id;
-
     if (!targetId) return reply(RED, "❌ Mentionne un membre ou fournis un ID.", [], true);
 
     const blrData = store.blr.get(targetId);
     if (!blrData) return reply(DARK, "Cet utilisateur n'est pas en Blacklist Rôle.");
 
     const u = await client.users.fetch(targetId).catch(() => null);
-
     return interaction.reply({ embeds: [
-      new EmbedBuilder()
-        .setColor(BLACK)
+      new EmbedBuilder().setColor(BLACK)
         .setDescription("╭───────────────\n│ 📄 Rapport BLR INFO\n╰───────────────")
         .addFields(
-          {
-            name:  "👤 Utilisateur",
-            value: `• Pseudo : ${u ? `<@${u.id}>` : `\`${targetId}\``}\n• Identifiant : \`${targetId}\``,
-          },
-          {
-            name:  "📝 Motif",
-            value: blrData.reason,
-          },
-          {
-            name:  "👮 Traitement",
-            value: `• Modérateur : <@${blrData.modId}>\n• Identifiant : \`${blrData.modId}\``,
-          },
-          {
-            name:  "📅 Date",
-            value: `• ${fmtDate(blrData.date)}`,
-          },
+          { name: "👤 Utilisateur", value: `• Pseudo : ${u ? `<@${u.id}>` : `\`${targetId}\``}\n• Identifiant : \`${targetId}\`` },
+          { name: "📝 Motif",       value: blrData.reason },
+          { name: "👮 Traitement",  value: `• Modérateur : <@${blrData.modId}>\n• Identifiant : \`${blrData.modId}\`` },
+          { name: "📅 Date",        value: `• ${fmtDate(blrData.date)}` },
         )
     ], ephemeral: true });
   }
 
   // ════════════════════════════════════════════
-  //  /wakeup — Déplace dans tous les vocaux 20s
-  //  Une seule session à la fois, anti-ratelimit
+  //  /wakeup
   // ════════════════════════════════════════════
   if (commandName === "wakeup") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "wakeup"))
       return reply(RED, "❌ Permission refusée pour `/wakeup`.", [], true);
-
     if (CONFIG.WAKEUP_ACTIVE)
       return reply(RED, "❌ Un wakeup est déjà en cours. Attendez qu'il se termine.", [], true);
 
     const targetUser   = interaction.options.getUser("membre");
     const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
 
-    if (!targetMember)
-      return reply(RED, "❌ Ce membre n'est pas sur le serveur.", [], true);
-    if (!targetMember.voice.channel)
-      return reply(RED, "❌ Ce membre n'est pas dans un salon vocal.", [], true);
+    if (!targetMember) return reply(RED, "❌ Ce membre n'est pas sur le serveur.", [], true);
+    if (!targetMember.voice.channel) return reply(RED, "❌ Ce membre n'est pas dans un salon vocal.", [], true);
 
-    const voiceChannels = guild.channels.cache
-      .filter(c => c.isVoiceBased())
-      .toArray();
-
-    if (voiceChannels.length < 2)
-      return reply(RED, "❌ Pas assez de salons vocaux sur le serveur.", [], true);
+    const voiceChannels = guild.channels.cache.filter(c => c.isVoiceBased()).toArray();
+    if (voiceChannels.length < 2) return reply(RED, "❌ Pas assez de salons vocaux sur le serveur.", [], true);
 
     const originalChannel = targetMember.voice.channel;
-    CONFIG.WAKEUP_ACTIVE = true;
+    CONFIG.WAKEUP_ACTIVE  = true;
 
     await interaction.reply({ embeds: [
       new EmbedBuilder().setColor(BLACK)
         .setDescription(`💤 **${targetUser.tag}** est en train de se faire **wakeup** pendant 20 secondes...`)
     ]});
 
-    // DM à la victime
     await sendDM(targetUser, makeEmbed(BLACK, `<@${member.id}> te demande de te réveiller !`));
 
     const otherChannels = voiceChannels.filter(c => c.id !== originalChannel.id);
-    let   i             = 0;
-    const endTime       = Date.now() + 20_000;
+    let i = 0;
+    const endTime = Date.now() + 20_000;
 
-    // Interval espacé pour éviter le ratelimit (1.5s entre chaque déplacement)
     const wakeInterval = setInterval(async () => {
       if (Date.now() >= endTime) {
         clearInterval(wakeInterval);
@@ -1799,18 +1583,16 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /dog — Met en laisse, lockname, suit en vocal
+  //  /dog
   // ════════════════════════════════════════════
   if (commandName === "dog") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "dog"))
       return reply(RED, "❌ Permission refusée pour `/dog`.", [], true);
 
     const targetUser = interaction.options.getUser("membre");
-
     if (isSystemPlus(targetUser.id))
       return reply(RED, "❌ Impossible de mettre en laisse un System+.", [], true);
 
-    // Vérifier la limite de laisses par maître
     const dogLimit = CONFIG.RATE_LIMITS.dog?.limit || 3;
     let masterDogCount = 0;
     for (const [, d] of store.dogs.entries()) {
@@ -1820,16 +1602,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
       return reply(RED, `❌ Tu as atteint ta limite de **${dogLimit} laisses** simultanées.`, [], true);
 
     const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
-
     store.dogs.set(targetUser.id, { masterId: member.id, date: new Date().toISOString() });
 
-    // Construire le pseudo verrouillé
     const masterDisplay = member.user.displayName || member.user.username;
     const victimDisplay = targetUser.displayName || targetUser.username;
     const lockedName    = `${victimDisplay}(🦮 ${masterDisplay})`;
 
     store.locknames.set(targetUser.id, lockedName);
-
     if (targetMember) {
       try { await targetMember.setNickname(lockedName, "Dog — pseudo verrouillé"); } catch {}
     }
@@ -1837,48 +1616,33 @@ client.on(Events.InteractionCreate, async (interaction) => {
     return interaction.reply({ embeds: [
       new EmbedBuilder().setColor(BLACK)
         .setDescription(`🐕 <@${targetUser.id}> est maintenant en laisse de <@${member.id}>.`)
-        .addFields(
-          { name: "Pseudo verrouillé", value: `\`${lockedName}\``, inline: true },
-        )
+        .addFields({ name: "Pseudo verrouillé", value: `\`${lockedName}\``, inline: true })
     ]});
   }
 
   // ════════════════════════════════════════════
-  //  /undog — Enlève la laisse (seul le maître ou bypass)
+  //  /undog
   // ════════════════════════════════════════════
   if (commandName === "undog") {
     const targetUser = interaction.options.getUser("membre");
     const dogData    = store.dogs.get(targetUser.id);
+    if (!dogData) return reply(DARK, "Cet utilisateur n'est pas en laisse.");
 
-    if (!dogData)
-      return reply(DARK, "Cet utilisateur n'est pas en laisse.");
-
-    // Vérification bypass
     const canBypass = isSystemPlus(member.id) || isSystem(member) || hasPerm(member, "dog_bypass");
     const isMaster  = dogData.masterId === member.id;
 
     if (!canBypass && !isMaster) {
-      // Vérifier si la laisse appartient à un system+ ou system
       const masterMember = await guild.members.fetch(dogData.masterId).catch(() => null);
       const isProtected  = masterMember ? (isSystemPlus(dogData.masterId) || isSystem(masterMember)) : false;
 
-      if (isProtected) {
-        // Avertissement + timeout 1 minute si insiste
-        await interaction.reply({ embeds: [
-          new EmbedBuilder().setColor(BLACK)
-            .setDescription(
-              isSystemPlus(dogData.masterId)
-                ? "❌ Vous n'avez pas l'autorisation de retirer la laisse d'un **system+**."
-                : `❌ Vous n'avez pas l'autorisation de retirer la laisse de <@${dogData.masterId}> car **Protect**.`
-            )
-        ]});
-        // Timeout 1 min d'avertissement (si réessaie géré via cooldown)
-        return;
-      }
-
       return interaction.reply({ embeds: [
         new EmbedBuilder().setColor(BLACK)
-          .setDescription("❌ Vous n'avez pas l'autorisation d'enlever une laisse qui n'est pas la vôtre.")
+          .setDescription(isProtected
+            ? (isSystemPlus(dogData.masterId)
+                ? "❌ Vous n'avez pas l'autorisation de retirer la laisse d'un **system+**."
+                : `❌ Vous n'avez pas l'autorisation de retirer la laisse de <@${dogData.masterId}> car **Protect**.`)
+            : "❌ Vous n'avez pas l'autorisation d'enlever une laisse qui n'est pas la vôtre."
+          )
       ]});
     }
 
@@ -1894,7 +1658,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /undogalls — Enlève toutes les laisses
+  //  /undogalls
   // ════════════════════════════════════════════
   if (commandName === "undogalls") {
     if (!isSystemPlus(member.id) && !isSystem(member) && !hasPerm(member, "dog_bypass"))
@@ -1907,27 +1671,22 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (m) { try { await m.setNickname(null, "Undogalls"); } catch {} }
     }
     store.dogs.clear();
-
     return reply(DARK, `✓ **${count}** laisse(s) retirée(s).`);
   }
 
   // ════════════════════════════════════════════
-  //  /doglist — Liste de tous les chiens
+  //  /doglist
   // ════════════════════════════════════════════
   if (commandName === "doglist") {
     if (!isSystemPlus(member.id) && !hasPerm(member, "dog"))
       return reply(RED, "❌ Permission refusée.", [], true);
-
-    if (!store.dogs.size)
-      return reply(DARK, "Aucun chien sur le serveur.");
+    if (!store.dogs.size) return reply(DARK, "Aucun chien sur le serveur.");
 
     const lines = [];
     for (const [dogId, dogData] of store.dogs.entries()) {
       const dog    = await client.users.fetch(dogId).catch(() => null);
       const master = await client.users.fetch(dogData.masterId).catch(() => null);
-      lines.push(
-        `🐕 ${dog ? `**${dog.tag}**` : `\`${dogId}\``} — Maître : ${master ? `**${master.tag}**` : `\`${dogData.masterId}\``}`
-      );
+      lines.push(`🐕 ${dog ? `**${dog.tag}**` : `\`${dogId}\``} — Maître : ${master ? `**${master.tag}**` : `\`${dogData.masterId}\``}`);
     }
 
     return interaction.reply({ embeds: [
@@ -1938,25 +1697,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /aykokemanmanw — BL permanente (seul System+ peut révoquer)
+  //  /aykokemanmanw
   // ════════════════════════════════════════════
   if (commandName === "aykokemanmanw") {
     if (!isSystemPlus(member.id))
       return reply(RED, "❌ Seul un **System+** peut utiliser `/aykokemanmanw`.", [], true);
 
     const targetUser = interaction.options.getUser("membre");
-
     if (isSystemPlus(targetUser.id))
       return reply(RED, "❌ Impossible d'aykokemanmanw un System+.", [], true);
 
     store.aykokemanmanw.set(targetUser.id, { executorId: member.id, date: new Date().toISOString() });
-    // Aussi blacklister
-    store.blacklist.set(targetUser.id, {
-      reason: "aykokemanmanw",
-      modId: member.id,
-      modType: "system+",
-      date: new Date().toISOString(),
-    });
+    store.blacklist.set(targetUser.id, { reason: "aykokemanmanw", modId: member.id, modType: "system+", date: new Date().toISOString() });
 
     const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
     if (targetMember) {
@@ -1977,7 +1729,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /viniw — Retire l'aykokemanmanw (System+ uniquement)
+  //  /viniw
   // ════════════════════════════════════════════
   if (commandName === "viniw") {
     if (!isSystemPlus(member.id))
@@ -1986,11 +1738,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const targetUser = interaction.options.getUser("membre");
     const rawId      = interaction.options.getString("id");
     const targetId   = targetUser?.id || rawId;
-
     if (!targetId) return reply(RED, "❌ Mentionne un membre ou fournis un ID.", [], true);
 
     const ayko = store.aykokemanmanw.get(targetId);
-    if (!ayko)  return reply(DARK, "Cet utilisateur n'est pas en aykokemanmanw.");
+    if (!ayko) return reply(DARK, "Cet utilisateur n'est pas en aykokemanmanw.");
 
     store.aykokemanmanw.delete(targetId);
     store.blacklist.delete(targetId);
@@ -2000,7 +1751,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /couniamanmanw — Timeout 28 jours, impossible à lever
+  //  /couniamanmanw
   // ════════════════════════════════════════════
   if (commandName === "couniamanmanw") {
     if (!isSystemPlus(member.id) && !isSystem(member) && !hasPerm(member, "couniamanmanw"))
@@ -2009,21 +1760,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const targetUser   = interaction.options.getUser("membre");
     const targetMember = await guild.members.fetch(targetUser.id).catch(() => null);
 
-    if (!targetMember)
-      return reply(RED, "❌ Ce membre n'est pas sur le serveur.", [], true);
-    if (isSystemPlus(targetUser.id))
-      return reply(RED, "❌ Impossible de couniamanmanw un System+.", [], true);
-    if (isSystem(targetMember) && !isSystemPlus(member.id))
-      return reply(RED, "❌ Impossible de couniamanmanw un System.", [], true);
+    if (!targetMember) return reply(RED, "❌ Ce membre n'est pas sur le serveur.", [], true);
+    if (isSystemPlus(targetUser.id)) return reply(RED, "❌ Impossible de couniamanmanw un System+.", [], true);
+    if (isSystem(targetMember) && !isSystemPlus(member.id)) return reply(RED, "❌ Impossible de couniamanmanw un System.", [], true);
 
-    const TIMEOUT_DURATION = 28 * 24 * 60 * 60 * 1000; // 28 jours en ms
+    const TIMEOUT_DURATION = 28 * 24 * 60 * 60 * 1000;
     const timeoutEnd       = Date.now() + TIMEOUT_DURATION;
 
-    store.couniamanmanw.set(targetUser.id, {
-      executorId: member.id,
-      date:       new Date().toISOString(),
-      timeoutEnd,
-    });
+    store.couniamanmanw.set(targetUser.id, { executorId: member.id, date: new Date().toISOString(), timeoutEnd });
 
     try {
       await targetMember.timeout(TIMEOUT_DURATION, "Couniamanmanw");
@@ -2035,8 +1779,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
       new EmbedBuilder().setColor(BLACK)
         .setDescription(`⏳ <@${targetUser.id}> est en **couniamanmanw** pour 28 jours.`)
         .addFields(
-          { name: "Par",        value: `<@${member.id}>`,                    inline: true },
-          { name: "Expire le",  value: `<t:${Math.floor(timeoutEnd/1000)}:F>`, inline: true },
+          { name: "Par",       value: `<@${member.id}>`,                     inline: true },
+          { name: "Expire le", value: `<t:${Math.floor(timeoutEnd/1000)}:F>`, inline: true },
         )
     ]});
   }
@@ -2047,17 +1791,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "uncouniamanmanw") {
     const targetUser = interaction.options.getUser("membre");
     const cmwData    = store.couniamanmanw.get(targetUser.id);
+    if (!cmwData) return reply(DARK, "Cet utilisateur n'est pas en couniamanmanw.");
 
-    if (!cmwData)
-      return reply(DARK, "Cet utilisateur n'est pas en couniamanmanw.");
-
-    // Vérification hiérarchie
     if (isSystemPlus(cmwData.executorId)) {
-      // Posé par system+ → seul system+ peut enlever
       if (!isSystemPlus(member.id))
         return reply(RED, "❌ Seul un **System+** peut retirer ce couniamanmanw.", [], true);
     } else if (isSystem({ id: cmwData.executorId, roles: { cache: new Map() } })) {
-      // Posé par system → system+ ou le même system
       if (!isSystemPlus(member.id) && member.id !== cmwData.executorId)
         return reply(RED, "❌ Seul un **System+** ou le **System** qui l'a posé peut le retirer.", [], true);
     }
@@ -2072,7 +1811,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  SETTINGS — Fonctions helpers communes
+  //  SETTINGS — Helper commun
   // ════════════════════════════════════════════
   async function handleSettingCmd(permKey, interaction, extraLabel = "") {
     if (!isSystemPlus(member.id))
@@ -2082,7 +1821,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const role   = interaction.options.getRole("role");
     const user   = interaction.options.getUser("utilisateur");
     const perm   = CONFIG.PERMS[permKey];
-
     if (!perm) return reply(RED, "Permission inconnue.", [], true);
 
     if (action === "show") {
@@ -2097,7 +1835,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
           )
       ], ephemeral: true });
     }
-
     if (action === "add") {
       if (!role && !user) return reply(RED, "Précise un `role` ou un `utilisateur`.", [], true);
       if (role && !perm.roles.includes(role.id)) perm.roles.push(role.id);
@@ -2105,7 +1842,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const added = [role && `<@&${role.id}>`, user && `<@${user.id}>`].filter(Boolean).join(", ");
       return reply(BLACK, `✓ ${added} peut maintenant utiliser \`${permKey}\`.`);
     }
-
     if (action === "remove") {
       if (!role && !user) return reply(RED, "Précise un `role` ou un `utilisateur`.", [], true);
       if (role) perm.roles = perm.roles.filter(id => id !== role.id);
@@ -2113,7 +1849,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
       const removed = [role && `<@&${role.id}>`, user && `<@${user.id}>`].filter(Boolean).join(", ");
       return reply(DARK, `✓ ${removed} retiré de la permission \`${permKey}\`.`);
     }
-
     return reply(RED, "Action inconnue.", [], true);
   }
 
@@ -2123,7 +1858,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "settingbl") {
     if (!isSystemPlus(member.id)) return reply(RED, "❌ Réservé aux **System+**.", [], true);
     const action = interaction.options.getString("action");
-
     if (action === "setlimit") {
       const limite = interaction.options.getInteger("limite");
       if (!limite) return reply(RED, "❌ Fournis une limite.", [], true);
@@ -2139,7 +1873,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "settingban") {
     if (!isSystemPlus(member.id)) return reply(RED, "❌ Réservé aux **System+**.", [], true);
     const action = interaction.options.getString("action");
-
     if (action === "setlimit") {
       const limite = interaction.options.getInteger("limite");
       if (!limite) return reply(RED, "❌ Fournis une limite.", [], true);
@@ -2186,7 +1919,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "settingdogs") {
     if (!isSystemPlus(member.id)) return reply(RED, "❌ Réservé aux **System+**.", [], true);
     const action = interaction.options.getString("action");
-
     if (action === "setlimit") {
       const limite = interaction.options.getInteger("limite");
       if (!limite) return reply(RED, "❌ Fournis une limite.", [], true);
@@ -2197,7 +1929,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /settingsaykokemanmanw — System+ uniquement
+  //  /settingsaykokemanmanw
   // ════════════════════════════════════════════
   if (commandName === "settingsaykokemanmanw") {
     if (!isSystemPlus(member.id)) return reply(RED, "❌ Réservé aux **System+**.", [], true);
@@ -2210,7 +1942,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "settingscouniamanmanw") {
     if (!isSystemPlus(member.id)) return reply(RED, "❌ Réservé aux **System+**.", [], true);
     const action = interaction.options.getString("action");
-
     if (action === "setlimit") {
       const limite = interaction.options.getInteger("limite");
       if (!limite) return reply(RED, "❌ Fournis une limite.", [], true);
@@ -2226,7 +1957,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (commandName === "settingmenotte") {
     if (!isSystemPlus(member.id)) return reply(RED, "❌ Réservé aux **System+**.", [], true);
     const action = interaction.options.getString("action");
-
     if (action === "setlimit") {
       const limite = interaction.options.getInteger("limite");
       if (!limite) return reply(RED, "❌ Fournis une limite.", [], true);
@@ -2237,7 +1967,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 
   // ════════════════════════════════════════════
-  //  /settingviniw — System+ uniquement
+  //  /settingviniw
   // ════════════════════════════════════════════
   if (commandName === "settingviniw") {
     if (!isSystemPlus(member.id)) return reply(RED, "❌ Réservé aux **System+**.", [], true);
@@ -2265,8 +1995,8 @@ client.on(Events.GuildBanAdd, async (ban) => {
     const logs  = await ban.guild.fetchAuditLogs({ limit: 1, type: 22 });
     const entry = logs.entries.first();
     if (!entry) return;
-    const isRecent = (Date.now() - entry.createdTimestamp) < 5000;
-    if (!isRecent || entry.target.id !== ban.user.id) return;
+    if ((Date.now() - entry.createdTimestamp) >= 5000) return;
+    if (entry.target.id !== ban.user.id) return;
     if (entry.executor.bot && entry.executor.id !== CONFIG.CLIENT_ID) {
       await ban.user.send({ embeds: [
         new EmbedBuilder().setColor(BLACK)
@@ -2281,7 +2011,7 @@ client.on(Events.GuildBanAdd, async (ban) => {
 //  DÉTECTION KICK EXTERNE → DM victime
 // ─────────────────────────────────────────────
 client.on(Events.GuildMemberRemove, async (member) => {
-  if (store.blacklist.has(member.id))    return;
+  if (store.blacklist.has(member.id))     return;
   if (store.aykokemanmanw.has(member.id)) return;
   if (store.ourKicks.has(member.id)) {
     store.ourKicks.delete(member.id);
@@ -2292,8 +2022,8 @@ client.on(Events.GuildMemberRemove, async (member) => {
     const logs  = await member.guild.fetchAuditLogs({ limit: 1, type: 20 });
     const entry = logs.entries.first();
     if (!entry) return;
-    const isRecent = (Date.now() - entry.createdTimestamp) < 5000;
-    if (!isRecent || entry.target.id !== member.id) return;
+    if ((Date.now() - entry.createdTimestamp) >= 5000) return;
+    if (entry.target.id !== member.id) return;
     if (entry.executor.bot && entry.executor.id !== CONFIG.CLIENT_ID) {
       await member.user.send({ embeds: [
         new EmbedBuilder().setColor(BLACK)
