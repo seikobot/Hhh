@@ -1,5 +1,5 @@
 // ============================================================
-//  MALEDIKE BOT — index.js  (version complète v2 — fix doublons)
+//  MALEDIKE BOT — index.js  (version complète v2)
 // ============================================================
 
 const {
@@ -256,7 +256,7 @@ const client = new Client({
 });
 
 // ─────────────────────────────────────────────
-//  SLASH COMMANDS — DÉFINITION (sans doublon)
+//  SLASH COMMANDS — DÉFINITION
 // ─────────────────────────────────────────────
 const slashCommands = [
 
@@ -541,35 +541,24 @@ const slashCommands = [
 const rest = new REST({ version: "10" }).setToken(BOT_TOKEN);
 
 // ─────────────────────────────────────────────
-//  READY — Déploiement SANS DOUBLONS (fix complet)
+//  READY — Déploiement des commandes (SANS DOUBLONS)
 // ─────────────────────────────────────────────
 client.once("ready", async () => {
   console.log(`✅ Bot connecté : ${client.user.tag}`);
   try {
-    // ÉTAPE 1 — Purge totale des commandes GLOBALES (source principale des doublons)
+    // 1) Purge des commandes globales (source des doublons)
     await rest.put(Routes.applicationCommands(CONFIG.CLIENT_ID), { body: [] });
     console.log("✅ Commandes globales purgées.");
 
-    // ÉTAPE 2 — Reset propre des commandes du serveur (évite tout résidu)
-    await rest.put(
-      Routes.applicationGuildCommands(CONFIG.CLIENT_ID, CONFIG.GUILD_ID),
-      { body: [] }
-    );
-    console.log("✅ Commandes serveur resetées.");
-
-    // Délai pour laisser Discord traiter la suppression
-    await new Promise(r => setTimeout(r, 1500));
-
-    // ÉTAPE 3 — Déploiement unique et propre sur le serveur
+    // 2) Enregistrement uniquement sur le serveur cible
     await rest.put(
       Routes.applicationGuildCommands(CONFIG.CLIENT_ID, CONFIG.GUILD_ID),
       { body: slashCommands }
     );
-    console.log(`✅ ${slashCommands.length} commandes déployées sur le serveur (0 doublon).`);
+    console.log(`✅ ${slashCommands.length} commandes slash déployées sur le serveur.`);
   } catch (err) {
     console.error("❌ Erreur déploiement:", err.message);
   }
-
   client.user.setPresence({
     activities: [{ name: "discord.gg/maledike", type: ActivityType.Playing }],
     status: "online",
